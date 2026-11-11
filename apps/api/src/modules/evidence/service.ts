@@ -24,7 +24,7 @@ import { checkExtraction, readWithPatternRules, type Extraction } from "./extrac
 
 export type Deps = { db: Db; clock: Clock; ai: EvidenceAi | null };
 
-const AI_MISSING = "No Claude API key is set for this server, so this step cannot use AI. The pattern-rule reader still works.";
+const AI_MISSING = "No AI key (ANTHROPIC_API_KEY or GEMINI_API_KEY) is set for this server, so this step cannot use AI. The pattern-rule reader still works.";
 
 export const NewDocument = z.object({
   kind: z.enum(["supplier_notice", "internal_note", "other"]).default("supplier_notice"),
@@ -79,22 +79,22 @@ const catalogueOf = (deps: Deps, orgId: string) =>
  */
 export async function extractDocument(
   deps: Deps,
-  input: { orgId: string; incidentId: string; documentId: string; userId: string; method: "auto" | "pattern_rules" | "claude" },
-): Promise<{ id: string; method: "claude" | "pattern_rules"; model: string | null; output: Extraction }> {
+  input: { orgId: string; incidentId: string; documentId: string; userId: string; method: "auto" | "pattern_rules" | "claude" | "ai" },
+): Promise<{ id: string; method: "claude" | "gemini" | "pattern_rules"; model: string | null; output: Extraction }> {
   const [document] = await deps.db.query<{ body: string; title: string }>(
     "select body, title from incident_documents where org_id = $1 and incident_id = $2 and id = $3",
     [input.orgId, input.incidentId, input.documentId],
   );
   if (!document) throw new NotFoundError("Document");
-  if (input.method === "claude" && !deps.ai) throw new NotConfiguredError("AI_NOT_CONFIGURED", AI_MISSING);
-  const method: "claude" | "pattern_rules" = input.method === "pattern_rules" || !deps.ai ? "pattern_rules" : "claude";
+  if ((input.method === "claude" || input.method === "ai") && !deps.ai) throw new NotConfiguredError("AI_NOT_CONFIGURED", AI_MISSING);
+  const method: "claude" | "gemini" | "pattern_rules" = input.method === "pattern_rules" || !deps.ai ? "pattern_rules" : deps.ai.provider;
   const catalogue = await catalogueOf(deps, input.orgId);
   const skus = catalogue.map((c) => c.sku);
 
   let output: Extraction;
-  if (method === "claude") {
+  if (method !== "pattern_rules") {
     const raw = await deps.ai!.readNotice({ document: document.body, catalogue });
-    if (!raw) throw new ConflictError("AI_NO_ANSWER", "Claude did not return a usable answer for this document. Use the pattern-rule reader, or enter the rules yourself.");
+    if (!raw) throw new ConflictError("AI_NO_ANSWER", "The model did not return a usable answer for this document. Use the pattern-rule reader, or enter the rules yourself.");
     output = checkExtraction(document.body, raw, skus);
   } else {
     output = checkExtraction(document.body, readWithPatternRules(document.body, skus), skus);
@@ -104,18 +104,18 @@ export async function extractDocument(
     const [row] = await tx.query<{ id: string }>(
       `insert into evidence_extractions (org_id, incident_id, document_id, method, model, output, warnings, created_at)
        values ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8) returning id`,
-      [input.orgId, input.incidentId, input.documentId, method, method === "claude" ? deps.ai!.model : null, json(output), json(output.warnings), now.toISOString()],
+      [input.orgId, input.incidentId, input.documentId, method, method !== "pattern_rules" ? deps.ai!.model : null, json(output), json(output.warnings), now.toISOString()],
     );
     await audit(tx, {
-      orgId: input.orgId, actor: method === "claude" ? { kind: "ai" } : { kind: "system" }, action: "evidence.extracted", entityType: "incident",
+      orgId: input.orgId, actor: method !== "pattern_rules" ? { kind: "ai" } : { kind: "system" }, action: "evidence.extracted", entityType: "incident",
       entityId: input.incidentId,
       data: {
-        extractionId: row!.id, documentId: input.documentId, method, model: method === "claude" ? deps.ai!.model : null, requestedBy: input.userId,
+        extractionId: row!.id, documentId: input.documentId, method, model: method !== "pattern_rules" ? deps.ai!.model : null, requestedBy: input.userId,
         products: output.products.length, batchCodes: output.batchCodes.length, dropped: output.dropped.length,
       },
       at: now,
     });
-    return { id: row!.id, method, model: method === "claude" ? deps.ai!.model : null, output };
+    return { id: row!.id, method, model: method !== "pattern_rules" ? deps.ai!.model : null, output };
   });
 }
 
@@ -151,7 +151,7 @@ export async function acceptExtraction(
   }
   const saved = await addRuleVersion(deps, {
     orgId: input.orgId, incidentId: input.incidentId, userId: input.userId, scope: input.scope, compensation: input.compensation,
-    note: input.note ?? `Read from "${row.title}" by ${row.method === "claude" ? "Claude" : "pattern rules"}, checked and saved by a member of staff.`,
+    note: input.note ?? `Read from "${row.title}" by ${row.method === "pattern_rules" ? "pattern rules" : row.method === "gemini" ? "Gemini" : "Claude"}, checked and saved by a member of staff.`,
   });
   const now = deps.clock.now();
   await deps.db.tx(async (tx) => {
@@ -229,7 +229,7 @@ export async function suggestAliases(deps: Deps, input: { orgId: string; inciden
           })),
         });
         aiUsed = answer !== null;
-        if (!answer) aiNote = "Claude did not return a usable answer.";
+        if (!answer) aiNote = "The model did not return a usable answer.";
         for (const opinion of answer?.opinions ?? []) {
           const target = pending.find((p) => p.id === opinion.id);
           // An opinion must rest on a title that is really on one of the order lines.
@@ -249,7 +249,7 @@ export async function suggestAliases(deps: Deps, input: { orgId: string; inciden
           });
         }
       } catch (err) {
-        aiNote = `Claude could not be reached: ${err instanceof Error ? err.message : String(err)}`;
+        aiNote = `The model could not be reached: ${err instanceof Error ? err.message : String(err)}`;
       }
     }
   }
@@ -327,7 +327,7 @@ export async function explainCandidate(
   const answer = await deps.ai.explainRecord({
     paymentIdentity: candidate.payment_identity, eligibility: candidate.eligibility, decision: candidate.decision, evidence, gaps,
   });
-  if (!answer) throw new ConflictError("AI_NO_ANSWER", "Claude did not return a usable answer. The evidence list on this record is complete without it.");
+  if (!answer) throw new ConflictError("AI_NO_ANSWER", "The model did not return a usable answer. The evidence list on this record is complete without it.");
   const ids = new Set([...evidence.map((e) => e.id), ...gaps.map((g) => g.id)]);
   const cited = <T extends { cites: string[] }>(items: T[]): T[] =>
     items.map((p) => ({ ...p, cites: p.cites.filter((c) => ids.has(c)) })).filter((p) => p.cites.length > 0);

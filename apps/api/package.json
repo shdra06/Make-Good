@@ -17,7 +17,8 @@
     "typecheck": "tsc --noEmit",
     "smoke": "node scripts/smoke.ts",
     "sandbox": "node scripts/sandbox-verify.ts",
-    "sandbox:recall": "node scripts/sandbox-recall.ts"
+    "sandbox:recall": "node scripts/sandbox-recall.ts",
+    "ai:verify": "node scripts/ai-verify.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.7.0",

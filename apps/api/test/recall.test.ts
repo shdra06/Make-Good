@@ -332,6 +332,7 @@ test("Claude's output is checked like any other reader's, and it can decide noth
   const calls: string[] = [];
   // Stands in for the model. It answers the way a careless or manipulated model might.
   const model: EvidenceAi = {
+    provider: "claude",
     model: "stand-in-model",
     readNotice: async () => {
       calls.push("readNotice");

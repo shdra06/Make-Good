@@ -496,11 +496,11 @@ function s1() {
       h("h3", {}, "Read the notice"),
       h("p", { class: "sub" }, "Pull out which products and batches the supplier names. Every line will quote the notice, and nothing is applied until you save it."),
       h("div", { class: "actions" },
-        h("button", { class: "btn primary", onclick: () => readNotice("auto") }, evidence.ai.configured ? "Read it with Claude" : "Read it"),
+        h("button", { class: "btn primary", onclick: () => readNotice("auto") }, evidence.ai.configured ? `Read it with ${evidence.ai.model}` : "Read it"),
         evidence.ai.configured && h("button", { class: "btn", onclick: () => readNotice("pattern_rules") }, "Read it with pattern rules")),
-      !evidence.ai.configured && h("p", { class: "note" }, "No Claude key is set on this server, so the notice is read with plain text rules against your catalogue. The check on the result is the same either way.")));
+      !evidence.ai.configured && h("p", { class: "note" }, "No AI key is set on this server, so the notice is read with plain text rules against your catalogue. The check on the result is the same either way.")));
   } else {
-    const by = extraction.method === "claude" ? `Read by Claude (${extraction.model})` : "Read by pattern rules, no AI";
+    const by = extraction.method === "pattern_rules" ? "Read by pattern rules, no AI" : `Read by ${extraction.method === "gemini" ? "Gemini" : "Claude"} (${extraction.model})`;
     right.push(h("div", { class: "card pad" },
       h("h3", {}, "What the notice says"),
       h("p", { class: "sub" }, `${by}. Each line was checked: it quotes the notice word for word, and its value is inside the quote.`),
@@ -612,13 +612,13 @@ function aliasPanel() {
       h("tbody", {}, a.aliases.map((x) => h("tr", {},
         h("td", {}, h("b", {}, x.alias), h("div", { class: "small muted" }, x.sampleTitles.join(" · "))),
         h("td", {}, x.canonicalSku),
-        h("td", {}, x.reason, x.ai && h("div", { class: "note" }, `Claude's opinion (${x.ai.model}): ${x.ai.verdict.replace(/_/g, " ")}. ${x.ai.reason} It quoted “${x.ai.quotedTitle}”. This is an opinion, not a decision.`)),
+        h("td", {}, x.reason, x.ai && h("div", { class: "note" }, `The model's opinion (${x.ai.model}): ${x.ai.verdict.replace(/_/g, " ")}. ${x.ai.reason} It quoted “${x.ai.quotedTitle}”. This is an opinion, not a decision.`)),
         h("td", { class: "num" }, x.lines),
         h("td", {}, x.batchCodes.join(", ") || "–"),
         h("td", { class: "nowrap" }, x.status === "suggested"
           ? [h("button", { class: "btn small", onclick: () => decideAlias(x, "confirm") }, "Same product"), " ", h("button", { class: "btn small", onclick: () => decideAlias(x, "reject") }, "Different")]
           : chip(x.status === "confirmed" ? `same product: ${x.decidedBy || "confirmed"}` : `different: ${x.decidedBy || "rejected"}`, x.status === "confirmed" ? "ok" : ""))))))),
-    state.evidence.ai.configured && open.length > 0 && h("div", { class: "actions" }, h("button", { class: "btn small", onclick: askClaudeAboutAliases }, "Ask Claude for an opinion on these")));
+    state.evidence.ai.configured && open.length > 0 && h("div", { class: "actions" }, h("button", { class: "btn small", onclick: askClaudeAboutAliases }, "Ask the AI for an opinion on these")));
 }
 
 // ----- 3. the evidence: the Recovery Map -----
@@ -709,8 +709,8 @@ function drawer() {
       state.detail.explanation
         ? [h("p", { style: "margin:6px 0" }, state.detail.explanation.explanation.summary),
            h("ul", { style: "margin:0;padding-left:18px" }, state.detail.explanation.explanation.points.map((p) => h("li", {}, p.text, " ", h("span", { class: "muted small" }, `[${p.cites.join(", ")}]`)))),
-           h("p", { class: "small muted", style: "margin-top:6px" }, `Written by Claude (${state.detail.explanation.model}) from the evidence above only. It changes nothing about this record.`)]
-        : h("button", { class: "btn small", style: "margin-top:8px", onclick: explain }, "Ask Claude to explain why this is held")),
+           h("p", { class: "small muted", style: "margin-top:6px" }, `Written by ${state.detail.explanation.model} from the evidence above only. It changes nothing about this record.`)]
+        : h("button", { class: "btn small", style: "margin-top:8px", onclick: explain }, "Ask the AI to explain why this is held")),
 
     truth && h("details", { class: "answer" },
       h("summary", { class: "ask", style: "cursor:pointer" }, "The known answer for this invented record"),
@@ -913,7 +913,7 @@ function s7() {
       h("p", { class: "sub", style: "margin-top:6px" }, "Every decision and every change, with who made it. Entries cannot be edited or deleted, and each one carries a hash of the one before."),
       h("div", { class: "audit" }, audit.rows.map((a) => h("div", {},
         h("span", { class: "muted" }, `${day(a.created_at)} ${clock(a.created_at)}`),
-        h("span", {}, a.actor_name || (a.actor_kind === "ai" ? "Claude" : a.actor_kind)),
+        h("span", {}, a.actor_name || (a.actor_kind === "ai" ? "AI model" : a.actor_kind)),
         h("span", {}, a.action.replace(/[._]/g, " ")))))));
   }
   return section("s7", 7, "What actually happened?", "PayPal's answer, not ours.", ...body);

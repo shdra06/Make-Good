@@ -168,7 +168,7 @@ An independent product review (10 Nov 2026) and the brief that followed it asked
 | Customer claim portal, evidence upload, review, appeal | **Not built** | |
 | Supplier notice stored with the incident and read into fields; each field must quote the notice and contain its value, or it is dropped | Verified with the pattern-rule reader | `test/recall.test.ts` |
 | Rules are saved only by a person, and cannot contain a code the notice never mentions | Verified | `test/recall.test.ts` |
-| Claude: reading a notice, an opinion on product-code aliases, explaining a held record. Structured outputs, checked by code, no tools | **Built, not verified against Claude** | No API key on this machine. Tested with a stand-in model that returns invented and unsupported output, all of which is dropped: `test/recall.test.ts` |
+| AI evidence steps (reading a notice, an opinion on product-code aliases, explaining a held record). Structured outputs, checked by code, no tools | **Verified against real Gemini** (`gemini-flash-latest`, 11 Nov 2026) with `npm run ai:verify`: the notice read correctly with nothing dropped; HM-3000 judged a different product; the title-only order judged the same product; "HM300" (title "Hand Mixer 300W") answered "cannot tell"; the explanation cited only real evidence; nothing changed any record. **Claude not verified**: no Anthropic key. | `scripts/ai-verify.ts`, `.data/ai-verification.json`; stand-in model tests in `test/recall.test.ts` |
 | AI reading of receipts and labels sent by customers | **Not built** | Belongs with the claims portal |
 | Email notices | **Not built** | Table exists; no transport code |
 
