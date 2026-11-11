@@ -110,8 +110,8 @@ export async function scenario(options: { dualControl?: boolean } = {}) {
     runIncidentMatch(deps, { orgId, incidentId, userId: operator, payoutsAvailable: true });
 
   /** Creates, submits, approves and starts a batch. Jobs are queued, not yet run. */
-  async function approvedBatch(incidentId: string, start = true) {
-    const { id, preview } = await createBatch(deps, { orgId, incidentId, userId: operator, name: "Batch 1" });
+  async function approvedBatch(incidentId: string, start = true, kind: "refund" | "payout" = "refund") {
+    const { id, preview } = await createBatch(deps, { orgId, incidentId, userId: operator, name: "Batch 1", kind });
     await submitBatch(deps, { orgId, batchId: id, userId: operator });
     await decideBatch(deps, { orgId, batchId: id, userId: approver, role: "finance_approver", decision: "approve" });
     if (start) await startBatch(deps, { orgId, batchId: id, userId: operator, spacingMs: 0 });

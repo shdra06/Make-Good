@@ -63,10 +63,12 @@ export type BatchStatus =
   | "rejected"
   | "cancelled";
 
+// A batch that is waiting for approval, or approved but not started, goes
+// back to "draft" when its payment list is invalidated (manifests.ts).
 const BATCH_ALLOWED: Record<BatchStatus, readonly BatchStatus[]> = {
   draft: ["pending_approval", "cancelled"],
-  pending_approval: ["approved", "rejected", "cancelled"],
-  approved: ["executing", "cancelled"],
+  pending_approval: ["approved", "rejected", "cancelled", "draft"],
+  approved: ["executing", "cancelled", "draft"],
   executing: ["paused", "completed", "completed_with_failures", "cancelled"],
   paused: ["executing", "cancelled", "completed", "completed_with_failures"],
   completed: [],

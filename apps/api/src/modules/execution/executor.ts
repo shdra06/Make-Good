@@ -17,6 +17,14 @@
 //
 //   4. No call is made while holding a database transaction. Claim, call,
 //      record: three steps, two short transactions.
+//
+//   5. Only what was approved is sent. Immediately before the call, the
+//      operation is checked against the approved manifest and against the
+//      records as they are now. If the approval no longer covers it, the
+//      payment is withheld. Nothing is sent "because it was approved earlier".
+//
+//   6. A failed refund stays failed. This file never turns a refund into a
+//      payout, and never tries a different route by itself.
 
 import { audit } from "../../platform/audit.ts";
 import type { Clock } from "../../platform/clock.ts";
@@ -33,6 +41,7 @@ import {
   type ProviderRefund,
 } from "../paypal/provider.ts";
 import { finishBatchIfDone, pauseBatch } from "./batches.ts";
+import { executionGuard } from "./manifests.ts";
 import { assertTransition, type OperationState } from "./state.ts";
 
 export type ProviderResolver = (orgId: string, connectionId: string) => Promise<PayPalProvider>;
@@ -373,6 +382,13 @@ export class OperationExecutor {
       }
       if (op.next_attempt_at && new Date(op.next_attempt_at) > now) {
         throw new RetryLater(new Date(op.next_attempt_at).getTime() - now.getTime(), "waiting for the rate limit");
+      }
+      const withheld = await executionGuard(tx, op);
+      if (withheld) {
+        // Not sent, and not retried. It shows on the batch as withheld, and the customer can go into a new, freshly approved batch.
+        await this.#move(tx, op, "cancelled", { failure_code: "APPROVAL_NO_LONGER_COVERS", failure_message: withheld }, { reason: "approval_no_longer_covers", detail: withheld }, now);
+        await finishBatchIfDone(tx, op.org_id, op.batch_id, now);
+        return null;
       }
       await this.#move(tx, op, "submitting", {}, { requestId: op.idempotency_key }, now);
       const attemptNo = await this.#openAttempt(tx, op, "submit", now);

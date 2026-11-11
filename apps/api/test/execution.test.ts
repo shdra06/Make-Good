@@ -364,12 +364,17 @@ test("payments older than 180 days are paid by payout, once, even when the reply
   await s.sync();
   const incidentId = await s.incident({ compensation: { type: "full_refund", allowPayout: true } });
   await s.match(incidentId);
-  const preview = await previewBatch(s.db, s.orgId, incidentId);
+  // A payout is a new payment to a person, not money going back the way it came. It is never
+  // mixed into a refund batch: it needs a batch, and an approval, of its own.
+  const asRefunds = await previewBatch(s.db, s.orgId, incidentId);
+  assert.equal(asRefunds.totals.count, 0);
+  assert.equal(asRefunds.notIncluded.payout_needs_its_own_approval, 1);
+  const preview = await previewBatch(s.db, s.orgId, incidentId, { kind: "payout" });
   assert.equal(preview.items[0]!.kind, "payout");
   assert.equal(preview.items[0]!.recipientType, "PAYPAL_ID");
 
   s.paypal.failNext({ on: "payout", when: "after", kind: "timeout" });
-  const { batchId } = await s.approvedBatch(incidentId);
+  const { batchId } = await s.approvedBatch(incidentId, true, "payout");
   await s.settle();
   const [op] = await s.operations(batchId);
   assert.equal(op!.state, "succeeded");
