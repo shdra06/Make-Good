@@ -444,49 +444,86 @@ function render() {
   if (document.querySelector(".drawer")) document.querySelector(".drawer").scrollTop = scroll;
 }
 
+const ICONS = {
+  notice: '<path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5M10 13h6M10 17h6"/>',
+  people: '<circle cx="9" cy="8" r="3"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><path d="M16 4.5a3 3 0 0 1 0 6M18 14c2 .8 3 2.8 3 6"/>',
+  check: '<rect x="4" y="3" width="16" height="18" rx="2"/><path d="m8 12 3 3 5-6"/>',
+  shield: '<path d="M12 3 4 6v6c0 4.5 3.4 8.3 8 9 4.6-.7 8-4.5 8-9V6z"/><path d="m9 12 2 2 4-4"/>',
+  arrow: '<path d="M5 12h14M13 6l6 6-6 6"/>',
+  lock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
+  mail: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/>',
+};
+function icon(name, cls = "ico") {
+  const el = document.createElement("span");
+  el.className = cls;
+  el.setAttribute("aria-hidden", "true");
+  el.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${ICONS[name]}</svg>`;
+  return el;
+}
+const logo = () => h("span", { class: "logo", "aria-hidden": "true" }, "MG");
+
 function buyerPage() {
   const c = state.confirm;
   const send = () => run(async () => {
     await post(`/api/public/confirm/${encodeURIComponent(c.token)}`, { batchCode: state.form.code || "" });
     c.done = true;
   });
-  return h("div", { class: "landing" },
+  return h("div", { class: "buyer" }, h("div", { class: "buyer-card card" },
+    h("div", { class: "buyer-head" }, logo(), h("span", {}, c.question ? c.question.merchant : "Make Good")),
     c.error ? [h("h1", {}, "This link cannot be used"), h("p", { class: "lede" }, c.error)]
-    : c.done ? [h("h1", {}, "Thank you"), h("p", { class: "lede" }, `${c.question.merchant} has your answer. A member of their staff will check it and contact you about what happens next. You do not need to do anything else.`)]
+    : c.done ? [icon("shield", "ico big ok"), h("h1", {}, "Thank you"), h("p", { class: "lede" }, `${c.question.merchant} has your answer. A member of their staff will check it and contact you about what happens next. You do not need to do anything else.`)]
     : [h("h1", {}, "One question about your order"),
        h("p", { class: "lede" }, `${c.question.merchant} is checking orders because of this: ${c.question.incident}.`),
-       h("p", {}, `Your order ${c.question.orderNumber || ""} included: ${c.question.product || "a product"}. Please find the batch code printed on the product or its box, and type it here exactly as printed.`),
-       h("label", { class: "field", style: "margin-top:18px;max-width:320px" }, h("span", {}, "Batch code"), h("input", { type: "text", autocomplete: "off", oninput: (e) => (state.form.code = e.target.value) })),
-       h("button", { class: "btn primary", onclick: send }, "Send"),
-       h("p", { class: "small muted", style: "margin-top:12px" }, "We ask only for the code. We will never ask for a password or payment details through this page.")]);
+       h("div", { class: "buyer-order" }, h("span", { class: "muted small" }, `Order ${c.question.orderNumber || ""}`), h("b", {}, c.question.product || "a product")),
+       h("p", {}, "Please find the batch code printed on the product or its box, and type it here exactly as printed."),
+       h("label", { class: "field", style: "margin-top:16px" }, h("span", {}, "Batch code"), h("input", { type: "text", autocomplete: "off", placeholder: "For example B-1234", oninput: (e) => (state.form.code = e.target.value) })),
+       h("button", { class: "btn primary wide", onclick: send }, "Send"),
+       h("p", { class: "small muted", style: "margin-top:14px" }, "We ask only for the code. We will never ask for a password or payment details through this page.")]));
 }
 
 function landing() {
+  const flow = [
+    ["notice", "Read the supplier's notice", "Into rules a person checks. Every line quotes the notice."],
+    ["people", "Ask two questions per buyer", "Is this their PayPal payment? Was their unit affected?"],
+    ["check", "Approve one exact list", "Versioned and hashed. Any change withdraws the approval."],
+    ["shield", "Pay through PayPal", "Only what PayPal confirms is shown as paid. Nothing twice."],
+  ];
   return h("div", { class: "landing" },
-    h("h1", {}, "Who is owed money, why, how much, and what was actually paid."),
-    h("p", { class: "lede" }, "A supplier recalls one batch of a product. Refunding is the easy part. Working out which customers received that batch, from records that never quite agree, is the hard part. Make Good does that part in the open."),
-    h("ol", {},
-      h("li", {}, "Read the supplier's notice into rules a person checks."),
-      h("li", {}, "Answer two questions for every buyer: is this their PayPal payment, and was their unit affected?"),
-      h("li", {}, "Show who is ready, who is held and who is left out, with the record behind each."),
-      h("li", {}, "Approve one exact payment list. Pay only that list, through PayPal, and show only what PayPal confirms.")),
-    h("button", { class: "btn primary", onclick: startDemo, disabled: state.busy > 0 }, "Open the recall case"),
-    h("p", { class: "small muted", style: "margin-top:10px" }, "Loads 32 invented orders for a kitchen shop on a built-in PayPal simulator. No real money and no real customers. It takes a few seconds."),
-    h("div", { class: "signin" },
-      h("h3", {}, "Already have an account?"),
-      h("label", { class: "field" }, h("span", {}, "Email"), h("input", { type: "email", autocomplete: "username", oninput: (e) => (state.form.email = e.target.value) })),
-      h("label", { class: "field" }, h("span", {}, "Password"), h("input", { type: "password", autocomplete: "current-password", oninput: (e) => (state.form.password = e.target.value) })),
-      h("button", { class: "btn", onclick: signIn }, "Sign in")));
+    h("div", { class: "land-top" }, h("div", { class: "brand" }, logo(), h("span", {}, "Make Good"))),
+    h("div", { class: "hero" },
+      h("div", { class: "hero-text" },
+        h("span", { class: "eyebrow" }, "Product recalls, refunded through PayPal"),
+        h("h1", {}, "Who is owed money, why, how much, and what was actually paid."),
+        h("p", { class: "lede" }, "A supplier recalls one batch of a product. Refunding is the easy part. Working out which customers received that batch, from records that never quite agree, is the hard part. Make Good does that part in the open."),
+        h("div", { class: "cta" },
+          h("button", { class: "btn primary big", onclick: startDemo, disabled: state.busy > 0 }, "Open the recall case", icon("arrow")),
+          h("span", { class: "small muted" }, "32 invented orders, built-in PayPal simulator, no real money. Takes a few seconds.")),
+        h("ul", { class: "trust" },
+          h("li", {}, icon("check"), "AI proposes, people decide"),
+          h("li", {}, icon("lock"), "Every step on an audit trail"),
+          h("li", {}, icon("shield"), "Tested on the real PayPal sandbox"))),
+      h("div", { class: "hero-art card" },
+        h("div", { class: "art-head" }, h("span", { class: "small muted" }, "How a recall is settled"), h("span", { class: "chip info" }, "Batch B-2217")),
+        flow.map(([ic, t, d], i) => h("div", { class: `flow ${i === flow.length - 1 ? "last" : ""}` },
+          icon(ic, "ico ring"), h("div", {}, h("b", {}, t), h("p", {}, d)))))),
+    h("details", { class: "signin" },
+      h("summary", {}, "Sign in to an existing account"),
+      h("div", { class: "signin-body" },
+        h("label", { class: "field" }, h("span", {}, "Email"), h("input", { type: "email", autocomplete: "username", oninput: (e) => (state.form.email = e.target.value) })),
+        h("label", { class: "field" }, h("span", {}, "Password"), h("input", { type: "password", autocomplete: "current-password", oninput: (e) => (state.form.password = e.target.value) })),
+        h("button", { class: "btn", onclick: signIn }, "Sign in"))));
 }
 
 function page() {
   if (!state.org || !state.map) {
-    return [topBar(), h("main", {}, h("div", { class: "card pad" },
+    return [h("div", { class: "shell" }, sidebar(), h("div", { class: "content" }, h("main", {}, h("div", { class: "card pad" },
       h("h3", {}, "No incident yet"),
       h("p", { class: "sub" }, "This account has no recall case loaded."),
-      h("button", { class: "btn primary", onclick: startDemo }, "Open the recall case in a new demo account")))];
+      h("button", { class: "btn primary", onclick: startDemo }, "Open the recall case in a new demo account")))))];
   }
-  const out = [topBar(), h("main", {}, s1(), s2(), s3(), s45(), s6(), s7())];
+  const next = nextStep();
+  const out = [h("div", { class: "shell" }, sidebar(next), h("div", { class: "content" }, caseHead(), h("main", {}, s1(), s2(), s3(), s45(), s6(), s7())))];
+  if (next && !state.detail) out.push(h("a", { class: "next", href: `#${next.id}` }, h("span", { class: "small" }, "Next step"), h("b", {}, next.text), icon("arrow")));
   if (state.detail) out.push(h("div", { class: "scrim", onclick: closeDetail }), drawer());
   return out;
 }
@@ -497,38 +534,84 @@ function progress() {
   return {
     rules: Boolean(m.rule), matched: Boolean(m.lastMatch), listed: Boolean(b),
     approved: Boolean(b && ["approved", "executing", "paused", "completed", "completed_with_failures"].includes(b.status)),
+    started: Boolean(b && ["executing", "paused", "completed", "completed_with_failures", "cancelled"].includes(b.status)),
     paid: Boolean(b && ["completed", "completed_with_failures"].includes(b.status)),
   };
 }
 
-function topBar() {
+function nextStep() {
+  if (!state.map) return null;
+  const p = progress();
+  const b = state.batch && state.batch.batch;
+  if (!p.rules) return { id: "s1", text: "Read the notice and save the rules" };
+  if (!p.matched) return { id: "s2", text: "Find affected customers" };
+  if (!p.listed) return { id: "s6", text: "Build the payment list" };
+  if (!p.approved) return { id: "s6", text: b.status === "draft" ? "Send the list for approval" : "Approve the list" };
+  if (!p.started) return { id: "s7", text: "Start paying" };
+  if (!p.paid) return { id: "s7", text: "Watch PayPal confirm each payment" };
+  const told = state.notices && state.notices.items.some((n) => n.kind === "payment_sent");
+  if (!told) return { id: "s7", text: "Tell the customers PayPal has paid" };
+  return null;
+}
+
+function sidebar(next) {
   const m = state.map;
   const p = m ? progress() : {};
   const env = m ? m.dataLabels.paypal : null;
   const steps = [
-    ["s1", "What went wrong", p.rules], ["s2", "Who might be affected", p.matched], ["s3", "The evidence", p.matched],
-    ["s4", "Options and cost", p.listed], ["s6", "What was approved", p.approved], ["s7", "What happened", p.paid],
+    ["s1", "What went wrong", "The supplier's notice", p.rules, false],
+    ["s2", "Who might be affected", "Two questions per buyer", p.matched, !p.rules],
+    ["s3", "The evidence", "The Recovery Map", p.matched, !p.matched],
+    ["s4", "Options and cost", "Three ways to pay", p.listed, !p.matched],
+    ["s6", "What was approved", "One exact payment list", p.approved, !p.matched],
+    ["s7", "What happened", "PayPal's answer", p.paid, !p.approved],
   ];
-  return h("div", { class: "top" },
-    h("div", { class: "top-row" },
-      h("div", { class: "brand" }, "Make Good", h("small", {}, "Evidence-backed incident recovery on PayPal")),
-      h("div", { class: "labels" },
-        m && h("span", { class: `label ${env === "simulator" ? "sim" : env === "sandbox" ? "sandbox" : ""}`, title: m.dataLabels.paypalMeaning },
-          "PayPal: ", h("b", {}, env === "simulator" ? "simulator, no real money" : env === "sandbox" ? "sandbox, test money" : env)),
-        m && h("span", { class: `label ${m.dataLabels.merchantRecords === "synthetic" ? "sim" : ""}` },
-          "Merchant records: ", h("b", {}, m.dataLabels.merchantRecords === "synthetic" ? "synthetic (invented)" : "your own")),
-        h("span", { class: "label" }, state.me.user.name),
-        h("button", { class: "btn small", onclick: signOut }, "Sign out"))),
+  return h("aside", { class: "sidebar top" },
+    h("div", { class: "brand" }, logo(), h("div", {}, "Make Good", h("small", {}, "Recall refunds on PayPal"))),
+    incTitle() && h("div", { class: "case" }, h("span", { class: "small muted" }, "Open case"), h("b", {}, incTitle())),
     m && h("nav", { class: "steps", "aria-label": "The seven questions" },
-      steps.map(([id, text, done], i) => h("a", { class: `step ${done ? "done" : ""}`, href: `#${id}` }, h("i", {}, String(i + 1)), text))));
+      steps.map(([id, text, sub, done, locked], i) => {
+        const now = next && next.id === id;
+        return h("a", { class: `step ${done ? "done" : ""} ${now ? "now" : ""} ${locked && !done ? "locked" : ""}`, href: `#${id}` },
+          h("i", {}, done ? "✓" : String(i + 1)),
+          h("span", {}, text, h("small", {}, now ? "Do this now" : locked && !done ? "Waiting" : sub)));
+      })),
+    h("div", { class: "labels" },
+      m && h("span", { class: `label ${env === "simulator" ? "sim" : env === "sandbox" ? "sandbox" : ""}`, title: m.dataLabels.paypalMeaning },
+        "PayPal: ", h("b", {}, env === "simulator" ? "simulator, no real money" : env === "sandbox" ? "sandbox, test money" : env)),
+      m && h("span", { class: `label ${m.dataLabels.merchantRecords === "synthetic" ? "sim" : ""}` },
+        "Merchant records: ", h("b", {}, m.dataLabels.merchantRecords === "synthetic" ? "synthetic (invented)" : "your own"))),
+    h("div", { class: "who" }, h("span", { class: "avatar" }, (state.me.user.name || "?").slice(0, 1).toUpperCase()), h("span", { class: "small" }, state.me.user.name),
+      h("button", { class: "btn small ghost", onclick: signOut }, "Sign out")));
+}
+
+const incTitle = () => (state.incident && state.incident.incident && state.incident.incident.title) || "";
+
+function caseHead() {
+  const m = state.map;
+  const g = (d) => (m.groups.find((x) => x.disposition === d) || { count: 0 }).count;
+  const matched = Boolean(m.lastMatch);
+  const ready = ["ready", "in_a_batch", "in_progress", "outcome_unknown", "paid", "payment_failed"].reduce((a, d) => a + g(d), 0);
+  const held = m.groups.filter((x) => x.group === "held").reduce((a, x) => a + x.count, 0);
+  const ops = (state.batch && state.batch.operations) || [];
+  const paid = ops.filter((o) => o.state === "succeeded");
+  const paidSum = paid.reduce((a, o) => a + Number(o.amount_minor), 0);
+  const kpi = (n, t, tone = "") => h("div", { class: `kpi ${tone}` }, h("div", { class: "n num" }, n), h("div", { class: "t" }, t));
+  return h("header", { class: "casehead" },
+    h("div", {}, h("span", { class: "eyebrow" }, "Recall case"), h("h1", {}, incTitle() || "Recall case")),
+    h("div", { class: "kpi-row" },
+      kpi(matched ? m.lastMatch.stats.linesConsidered : "–", "order lines checked"),
+      kpi(matched ? ready : "–", "ready or approved", "ok"),
+      kpi(matched ? held : "–", "waiting for a person", "hold"),
+      kpi(paid.length ? money(paidSum, paid[0].currency) : "–", `confirmed by PayPal${paid.length ? ` (${paid.length})` : ""}`, "info")));
 }
 
 function section(id, number, title, hint, ...body) {
   return h("section", { class: "section", id },
-    h("header", {}, h("span", { class: "q" }, `Question ${number}`), h("h2", {}, title), hint && h("p", { class: "hint" }, hint)),
+    h("header", {}, h("span", { class: "qn" }, String(number)), h("div", {}, h("span", { class: "q" }, `Question ${number}`), h("h2", {}, title), hint && h("p", { class: "hint" }, hint))),
     ...body);
 }
-const lockedNote = (text) => h("div", { class: "locked-note" }, text);
+const lockedNote = (text) => h("div", { class: "locked-note" }, icon("lock"), text);
 
 // ----- 1. what went wrong -----
 
@@ -966,7 +1049,7 @@ function s7() {
     body.push(h("div", { class: "card pad" },
       h("div", { class: "manifest-head", style: "margin-bottom:10px" },
         h("h3", { style: "margin:0" }, "Each payment, as PayPal reports it"),
-        Object.entries(counts).map(([k, n]) => chip(`${n} ${k.toLowerCase()}`, Object.values(OP_STATE).find((v) => v[0] === k)?.[1] || "stop")),
+        Object.entries(counts).map(([k, n]) => chip(`${n} ${k.charAt(0).toLowerCase() + k.slice(1)}`, Object.values(OP_STATE).find((v) => v[0] === k)?.[1] || "stop")),
         b.paused_reason && chip(`paused: ${b.paused_reason}`, "hold")),
       h("div", { class: "scroll-x", style: "max-height:380px;overflow-y:auto" }, h("table", { class: "plain" },
         h("thead", {}, h("tr", {}, ["Order", "Customer", "Amount", "Status", "PayPal refund ID", "Calls", "Note"].map((t) => h("th", {}, t)))),

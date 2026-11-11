@@ -11,7 +11,7 @@ A PayPal hackathon project. When a supplier recalls one batch of a product, Make
 | Path | What |
 |---|---|
 | `apps/api/` | The platform backend. Fastify, TypeScript run directly by Node 24 (no build), PostgreSQL via PGlite locally. Port 4000. |
-| `apps/web/public/` | The page: `index.html`, `app.js`, `styles.css`. Plain JS, no build. Served by the API. |
+| `apps/web/public/` | The page: `index.html`, `app.js`, `styles.css`. Plain JS, no build. Served by the API. App shell: navy sidebar with the steps (`sidebar()`, `nextStep()`), case header with key numbers (`caseHead()`), a floating "Next step" button. Do not reuse the class name `side` (the matrix uses it). |
 | `apps/api/db/migrations/` | `0001` to `0004`. Applied files are never edited; add `0005_…`. |
 | `docs/CHECKLIST.md` | Status of everything, with evidence. Change it only after something ran and passed. |
 | `docs/` others | `STRATEGY.md`, `DEMO.md`, `ARCHITECTURE.md`, `PAYPAL.md`, `VERIFICATION.md` |
@@ -91,4 +91,4 @@ Known loose end: another session's `integration/proposed-0002_…sql` (outside t
 
 ## Last session
 
-11 Nov 2026 (sixth sitting, Opus): Claude removed (code, config, SDK); Gemini is the only AI. 120 tests and the browser test pass. `npm run ai:verify` could not run: the Gemini key returned 429 (daily limit), re-run it tomorrow. Earlier the same day: CSV upload box and customer emails. Next: re-run ai:verify, re-record the video.
+11 Nov 2026 (seventh sitting, Opus): new look for the presentation: PayPal-blue app shell with a step sidebar, key numbers, Next-step button, new landing and customer page. Browser test passes; screenshots re-made without AI (Gemini key at its daily limit). Claude removed earlier the same day. Next: when Gemini works again, run `npm run ai:verify`, then `npm run demo:capture` for the final video.
