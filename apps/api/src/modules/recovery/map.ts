@@ -151,7 +151,8 @@ export async function recoveryMap(q: Queryable, orgId: string, incidentId: strin
     add(d.amount, r.currency, r.payable_minor);
     add(d.paid, r.currency, r.paid_minor);
     dispositions.set(r.disposition, d);
-    if (r.status !== "cleared") {
+    // The table shows records that could still be paid. Excluded and declined ones are listed apart, under "restricted".
+    if (r.status === "proposed" || r.status === "confirmed") {
       const key = `${r.payment_identity}|${r.eligibility}`;
       const m = matrix.get(key) ?? { paymentIdentity: r.payment_identity, eligibility: r.eligibility, count: 0, units: 0, amount: {} };
       m.count += r.n;
@@ -186,7 +187,7 @@ export async function recoveryMap(q: Queryable, orgId: string, incidentId: strin
       knownAnswersAvailable: (labelled[0]?.n ?? 0) > 0,
     },
     groups,
-    /** The two questions, crossed. Records shown not to be affected are left out of this table. */
+    /** The two questions, crossed, for records that could still be paid. */
     matrix: [...matrix.values()],
     restricted,
     liability: {
@@ -277,6 +278,8 @@ export async function comparePolicies(
         payNow: bucket(),
         /** Of payNow: customers whose unit no record proves. This is the exposure to paying someone who was not affected. */
         ofWhichUnproven: bucket(),
+        /** Of those: customers a named person has already confirmed. They are paid under every policy. */
+        alreadyConfirmedByAPerson: 0,
         /** Included by the policy, but the payment is not settled, so nothing can be sent yet. */
         blockedUntilPaymentReconciled: bucket(),
         /** Owed, but not through a PayPal refund: paid another way, too old, or needing a person. */
@@ -319,7 +322,10 @@ export async function comparePolicies(
         }
         if (calc.route === "refund_original" && r.payment_identity === "verified") {
           put(out.payNow, r.affected_quantity, calc.currency, calc.payableMinor);
-          if (r.eligibility !== "proven") put(out.ofWhichUnproven, r.affected_quantity, calc.currency, calc.payableMinor);
+          if (r.eligibility !== "proven") {
+            put(out.ofWhichUnproven, r.affected_quantity, calc.currency, calc.payableMinor);
+            if (!include.has(r.eligibility)) out.alreadyConfirmedByAPerson++;
+          }
           if (out.againstKnownAnswers && truth !== null) out.againstKnownAnswers.unitsPaidThatWereNotAffected += Math.max(0, r.affected_quantity - truth);
         } else {
           if (calc.route === "refund_original") put(out.blockedUntilPaymentReconciled, r.affected_quantity, calc.currency, calc.payableMinor);
@@ -327,14 +333,18 @@ export async function comparePolicies(
           if (out.againstKnownAnswers && truth !== null) out.againstKnownAnswers.affectedUnitsNotPaidNow += Math.min(truth, r.affected_quantity);
         }
       }
+      const byPolicy = out.ofWhichUnproven.customers - out.alreadyConfirmedByAPerson;
+      const already = out.alreadyConfirmedByAPerson > 0
+        ? ` ${out.alreadyConfirmedByAPerson} customer(s) without a packing record are included because a member of staff already confirmed them by name.`
+        : "";
       out.tradeOff =
-        out.ofWhichUnproven.customers > 0
-          ? `Pays ${out.ofWhichUnproven.customers} customer(s) whose unit no record proves. Faster for them, and each one is a payment you may not owe.`
+        byPolicy > 0
+          ? `Pays ${byPolicy} customer(s) whose unit no record proves. Faster for them, and each one is a payment you may not owe.${already}`
           : policy.askTheRest
-            ? `Pays nobody without proof. ${out.askedToConfirm} customer(s) must reply before they are paid, and some will not reply.`
+            ? `Adds nobody without proof. ${out.askedToConfirm} customer(s) must reply before they are paid, and some will not reply.${already}`
             : out.notPaid.customers > 0
-              ? `Pays nobody without proof. ${out.notPaid.customers} possibly affected customer(s) are left unpaid unless they come forward.`
-              : "Every possibly affected customer is covered by proof.";
+              ? `Adds nobody without proof. ${out.notPaid.customers} possibly affected customer(s) are left unpaid unless they come forward.${already}`
+              : `Every possibly affected customer is covered.${already}`;
       return out;
     }),
   };

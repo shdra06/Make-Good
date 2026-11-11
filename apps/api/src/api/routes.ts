@@ -614,6 +614,30 @@ export function buildApp(c: Container): Router {
     handler: async ({ org, user }) => seedRecallScenario({ db: c.db, clock: c.clock, connections: c.connections }, { orgId: org.orgId, userId: user.id }),
   });
 
+  route({
+    method: "POST", path: "/api/orgs/:orgId/demo/faults", summary: "Simulator only: make the next PayPal reply get lost, or refund a payment as if in the PayPal dashboard", tag: "Demo",
+    auth: { permission: "org.manage" }, params: OrgParams,
+    body: z.discriminatedUnion("kind", [
+      z.object({ kind: z.literal("lose_next_reply") }),
+      z.object({ kind: z.literal("refund_elsewhere"), captureId: z.string().min(5).max(40) }),
+    ]),
+    handler: async ({ body, org }) => {
+      const active = await c.connections.active(org.orgId);
+      if (!active || active.environment !== "simulator") {
+        throw new ConflictError("NOT_SIMULATOR", "Faults can only be staged on the simulator. On PayPal's sandbox, use `npm run sandbox:recall`, which stages them around real calls.");
+      }
+      const sim = await c.connections.simulatorFor(org.orgId);
+      if (body.kind === "lose_next_reply") {
+        // PayPal will act on the next refund, and its reply will not arrive.
+        sim.failNext({ on: "refund", when: "after", kind: "timeout" });
+        return { staged: "The reply to the next refund request will be lost after the simulator has made the refund." };
+      }
+      // As if a member of staff refunded it in the PayPal dashboard. Our records do not learn of it until the next sync.
+      const refund = await sim.refundCapture(body.captureId, { requestId: `dashboard-${body.captureId}` });
+      return { staged: `Payment ${body.captureId} was refunded in full at the simulator, outside Make Good (${refund.id}).` };
+    },
+  });
+
   // ---------- PayPal webhooks ----------
   // In its own scope, so the body can be kept exactly as PayPal sent it for the signature check.
 

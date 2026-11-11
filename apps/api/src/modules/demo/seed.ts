@@ -199,6 +199,9 @@ export async function seedRecallScenario(
     },
   });
   const loaded = await loadRecallScenario({ db, clock }, { orgId: input.orgId, userId: input.userId, data });
-  const stats = await syncTransactions({ db, clock }, { orgId: input.orgId, connectionId: active.id, provider: sim, from: new Date(now.getTime() - 120 * DAY), to: now });
+  // The back-story refunds were made a moment ago, so the window must end now, not when loading began.
+  const stats = await syncTransactions({ db, clock }, {
+    orgId: input.orgId, connectionId: active.id, provider: sim, from: new Date(now.getTime() - 120 * DAY), to: new Date(clock.now().getTime() + 1000),
+  });
   return { incidentId: loaded.incidentId, documentId: loaded.documentId, orders: loaded.orders, payments: stats.payments, labels: loaded.labels, skipped: data.skipped };
 }

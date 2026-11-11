@@ -129,7 +129,7 @@ test("the recall case, from the supplier's notice to PayPal's confirmation", asy
   const cell = (identity: string, eligibility: string) => map.matrix.find((m: any) => m.paymentIdentity === identity && m.eligibility === eligibility)?.count ?? 0;
   assert.deepEqual(
     [cell("verified", "proven"), cell("verified", "supported"), cell("verified", "uncertain"), cell("ambiguous", "proven"), cell("missing", "proven"), cell("missing", "unknown")],
-    [12, 2, 2, 3, 1, 1],
+    [10, 2, 2, 3, 1, 1],
   );
 
   // ---- 3. What the evidence says: one held record, in full ----
