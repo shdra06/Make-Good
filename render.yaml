@@ -1,0 +1,48 @@
+# Render Blueprint for Make Good: one web service (API, job worker and page)
+# and one PostgreSQL database. On Render: New > Blueprint > pick this repo.
+#
+# Runs on the PayPal simulator (no real money) with the synthetic recall case.
+# Render asks for GEMINI_API_KEY when the Blueprint is created; leave it empty
+# and the notice is read by pattern rules instead.
+#
+# Free plans: the service sleeps after 15 minutes without visitors (the first
+# visit then takes about a minute), and the free database expires after 30 days.
+
+services:
+  - type: web
+    name: make-good
+    runtime: node
+    plan: free
+    region: oregon
+    buildCommand: npm ci --prefix apps/api --omit=dev
+    startCommand: node apps/api/src/server.ts
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: "24"
+      - key: NODE_ENV
+        value: production
+      # One process runs the API and the payment worker.
+      - key: WORKER_INLINE
+        value: "true"
+      # The built-in PayPal simulator, for the demo. No real money moves.
+      - key: ALLOW_SIMULATOR
+        value: "true"
+      - key: MAKEGOOD_ENCRYPTION_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: make-good-db
+          property: connectionString
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: LOG_LEVEL
+        value: info
+
+databases:
+  - name: make-good-db
+    plan: free
+    region: oregon
+    databaseName: makegood
+    user: makegood

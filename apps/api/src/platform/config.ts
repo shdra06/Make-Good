@@ -1,6 +1,7 @@
 // Configuration comes from the environment and is checked once at start.
 // Nothing else reads process.env.
 
+import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -16,7 +17,9 @@ const bool = z
 const Env = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   PORT: z.coerce.number().int().min(1).max(65535).default(4000),
-  PUBLIC_URL: z.string().url().default("http://localhost:4000"),
+  PUBLIC_URL: z.string().url().optional(),
+  /** Set by Render to the service's https address. Used when PUBLIC_URL is not set. */
+  RENDER_EXTERNAL_URL: z.string().url().optional(),
   /** PostgreSQL connection string. Without it the built-in local database is used. */
   DATABASE_URL: z.string().optional(),
   DATA_DIR: z.string().default(path.join(ROOT, ".data")),
@@ -81,6 +84,16 @@ function developmentKey(dataDir: string): string {
   return key;
 }
 
+/**
+ * The key must be 32 bytes, base64. A hosting service's generated secret may be
+ * some other random string; that is hashed to 32 bytes instead of refused.
+ */
+function normaliseKey(value: string): string {
+  if (/^[A-Za-z0-9+/]{43}=$/.test(value) && Buffer.from(value, "base64").length === 32) return value;
+  if (value.length < 32) throw new Error("MAKEGOOD_ENCRYPTION_KEY is too short: use 32 random bytes, base64.");
+  return createHash("sha256").update(value, "utf8").digest("base64");
+}
+
 export function loadConfig(source: NodeJS.ProcessEnv = process.env, options: { readEnvFiles?: boolean } = {}): Config {
   if (options.readEnvFiles !== false && source === process.env) loadEnvFiles();
   const blanksRemoved = Object.fromEntries(Object.entries(source).filter(([, v]) => v !== undefined && v !== ""));
@@ -92,7 +105,7 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env, options: { r
   const env = parsed.data;
   const production = env.NODE_ENV === "production";
 
-  let encryptionKey = env.MAKEGOOD_ENCRYPTION_KEY;
+  let encryptionKey = env.MAKEGOOD_ENCRYPTION_KEY && normaliseKey(env.MAKEGOOD_ENCRYPTION_KEY);
   let encryptionKeySource: Config["encryptionKeySource"] = "environment";
   if (!encryptionKey) {
     if (production) throw new Error("MAKEGOOD_ENCRYPTION_KEY is required in production.");
@@ -107,7 +120,7 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env, options: { r
   return {
     env: env.NODE_ENV,
     port: env.PORT,
-    publicUrl: env.PUBLIC_URL.replace(/\/$/, ""),
+    publicUrl: (env.PUBLIC_URL ?? env.RENDER_EXTERNAL_URL ?? `http://localhost:${env.PORT}`).replace(/\/$/, ""),
     databaseUrl: env.DATABASE_URL ?? null,
     dataDir: env.DATA_DIR,
     encryptionKey,
