@@ -4,3 +4,6 @@ data/*.db
 data/*.db-*
 data/uploads/
 *.log
+
+# crash dumps from command-line tools
+*.stackdump
