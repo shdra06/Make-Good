@@ -58,7 +58,7 @@ An independent product review (10 Nov 2026) and the brief that followed it asked
 | **Review: metrics measured, not asserted** | Verified | `GET /evaluation`: who is affected (precision, recall, held, missed), which payment, amounts, what was paid, duplicates, completion, work left for people, clock times. Each figure is a count from the run |
 | Label synthetic records, sandbox payments and real PayPal answers | Verified | Every screen states the PayPal environment and whether merchant records are synthetic. The manifest records the environment |
 | **Review: seven questions in order; a three-minute demo** | Verified in a browser on the simulator | `apps/web/public`, `docs/DEMO.md` |
-| **Review P1: one real notification channel, or label it simulated** | Not built | No notices are sent or previewed. The buyer confirmation link is not built: staff record a customer's answer by hand |
+| **Review P1: one customer batch-code confirmation link** | Verified in tests and in a browser | Staff make a one-use link; the customer types the code; it is stored as evidence and staff still decide. `test/manifest.test.ts`. The link is copied by hand: **no email is sent** |
 | **Review: cut payouts, claims, image analysis and duplicate-charge scanning from the critical path** | Done | They remain in the code and the API. None is on the page or in the demo |
 | Merchant interviews (five questions) | **Blocked on you** | Needs three to five people who run a shop |
 
@@ -112,7 +112,7 @@ An independent product review (10 Nov 2026) and the brief that followed it asked
 | Order to payment linking: exact (store reference, invoice ID, custom ID) and heuristic (flagged) | Verified | `test/matching.test.ts`, `test/execution.test.ts` |
 | WooCommerce connector | Not built | Needs a test store |
 | Shopify connector | Not built | Needs a Shopify partner account and a development store |
-| CSV upload | Not built | |
+| CSV upload (one row per order line; unreadable rows reported by row number; nothing half-imported) | Verified through the API and parser tests. No upload button on the page yet. | `test/csv.test.ts` |
 | Orders linked to real sandbox payments by PayPal's payment ID | **Verified on the sandbox** | The orders came through the import format, not from a store |
 | Fetching a payment by ID when Transaction Search is behind or not permitted | Verified on the simulator and the sandbox | `test/execution.test.ts`, `npm run sandbox` |
 | A real store (WooCommerce or Shopify) as the source of those orders | **Blocked** | Needs a test store |
@@ -208,7 +208,8 @@ The page is `apps/web/public` (plain HTML, CSS and JavaScript, no build step), s
 | Item | State |
 |---|---|
 | Runs locally with one command, no database to install | Verified |
-| Dockerfile, CI workflow, Render configuration | **Not built** |
+| Dockerfile and CI workflow (type check and tests) | **Built, not verified.** No Docker on the development machine; the CI run on GitHub has not been checked |
+| Render or other host configuration | **Not built** |
 | Deployed instance | **Not built** |
 
 ## Blocked on you

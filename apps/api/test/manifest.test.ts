@@ -11,6 +11,7 @@ import { test } from "node:test";
 import { enqueue } from "../src/platform/jobs/queue.ts";
 import { createBatch, decideBatch, previewBatch, reviseBatch, startBatch, submitBatch } from "../src/modules/execution/batches.ts";
 import { currentManifest, hashManifest, listManifests, manifestCsv } from "../src/modules/execution/manifests.ts";
+import { answerConfirm, confirmQuestion, createConfirmLink } from "../src/modules/incidents/confirm.ts";
 import { addRuleVersion, decideCandidates, reconcilePayment } from "../src/modules/incidents/service.ts";
 import { scenario, type Scenario } from "./scenario.ts";
 
@@ -404,4 +405,32 @@ test("a person's confirmation is stored in their name, survives a new match and 
   const item = (await currentManifest(s.db, s.orgId, batchId))!.content.items[0]!;
   assert.deepEqual([item.eligibility, item.confirmedBy, item.confirmationBasis], ["unknown", "olive", "customer_confirmed_unit"]);
   assert.ok(item.evidence.some((e) => e.source === "customer_statement"));
+});
+
+test("a customer's answer through a link is evidence for staff, and pays nobody by itself", async () => {
+  const s = await scenario();
+  const a = await s.sell({ batchCode: null, shippedAt: null });
+  await s.sync();
+  const incidentId = await s.incident();
+  await s.match(incidentId);
+  const [candidate] = await candidates(s, incidentId);
+  const { token } = await createConfirmLink(s.deps, { orgId: s.orgId, candidateId: candidate!.id, userId: s.operator });
+  const asked = await confirmQuestion(s.deps, token);
+  assert.deepEqual([asked.orderNumber, asked.product], [a.orderNumber, "Hand mixer HM-300"]);
+  assert.equal(JSON.stringify(asked).includes(a.email), false, "the page shows no email address");
+
+  await answerConfirm(s.deps, { token, batchCode: " lot 24b " });
+  await assert.rejects(answerConfirm(s.deps, { token, batchCode: "LOT-24B" }), /not found/, "the link works once");
+  await s.match(incidentId);
+  const [after] = await candidates(s, incidentId);
+  assert.equal(after!.status, "proposed", "the record is still waiting for a member of staff");
+  assert.equal((await previewBatch(s.db, s.orgId, incidentId)).totals.count, 0);
+  const [evidence] = await s.db.query<{ fact: string; strength: string }>(
+    "select fact, strength from match_evidence where candidate_id = $1 and source = 'customer_statement'", [candidate!.id],
+  );
+  assert.equal(evidence!.strength, "supports");
+  assert.match(evidence!.fact, /entered the batch code "lot 24b".*It is an affected batch/);
+
+  await decideCandidates(s.deps, { orgId: s.orgId, incidentId, userId: s.operator, candidateIds: [candidate!.id], decision: "confirm", basis: "customer_confirmed_unit" });
+  assert.equal((await previewBatch(s.db, s.orgId, incidentId)).totals.count, 1);
 });

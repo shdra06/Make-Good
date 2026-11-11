@@ -6,6 +6,7 @@ import type { Container } from "../container.ts";
 import { DAY } from "../platform/clock.ts";
 import { ConflictError, NotFoundError, ValidationError } from "../platform/errors.ts";
 import { enqueue } from "../platform/jobs/queue.ts";
+import { CSV_COLUMNS, ordersFromCsv } from "../modules/commerce/csv.ts";
 import { BatchImport, OrderImport, upsertBatch, upsertOrder } from "../modules/commerce/ingest.ts";
 import { seedDemoData, seedRecallScenario } from "../modules/demo/seed.ts";
 import { convertDetection, DETECTORS, runDetectors, setDetectionStatus } from "../modules/detection/service.ts";
@@ -30,6 +31,7 @@ import {
   updateOrgSettings,
 } from "../modules/identity/service.ts";
 import { addRuleVersion, createIncident, decideCandidates, DecisionBasis, NewIncident, NewRuleVersion, reconcilePayment, runIncidentMatch } from "../modules/incidents/service.ts";
+import { answerConfirm, confirmQuestion, createConfirmLink } from "../modules/incidents/confirm.ts";
 import { receivePayPalWebhook } from "../modules/paypal/webhooks.ts";
 import { comparePolicies, PolicyInput, recoveryMap } from "../modules/recovery/map.ts";
 import * as reports from "../modules/reporting/queries.ts";
@@ -256,6 +258,31 @@ export function buildApp(c: Container): Router {
     },
   });
   route({
+    method: "POST", path: "/api/orgs/:orgId/stores/:storeId/orders/csv", summary: "Import orders from CSV text (one row per order line). With dryRun, only checks the file.", tag: "Commerce",
+    auth: { permission: "data.import" }, params: OrgParams.extend({ storeId: uuid }),
+    body: z.object({ csv: z.string().min(1).max(4_000_000), dryRun: z.boolean().default(false) }),
+    handler: async ({ body, params, org }) => {
+      const store = await c.db.query("select 1 from commerce_connections where org_id = $1 and id = $2", [org.orgId, params.storeId]);
+      if (store.length === 0) throw new NotFoundError("Store");
+      const parsed = ordersFromCsv(body.csv);
+      const out = { rows: parsed.rows, orders: parsed.orders.length, errors: parsed.errors, columns: CSV_COLUMNS, imported: false, created: 0, updated: 0, warnings: [] as string[], links: { exact: 0, heuristic: 0 } };
+      // A file with unreadable rows is not half-imported: fix the file, then send it again.
+      if (body.dryRun || parsed.errors.length > 0 || parsed.orders.length === 0) return out;
+      await c.db.tx(async (tx) => {
+        for (const order of parsed.orders) {
+          const result = await upsertOrder(tx, org.orgId, params.storeId, order);
+          if (result.created) out.created++;
+          else out.updated++;
+          out.warnings.push(...result.warnings);
+        }
+        out.links = await linkOrdersToPayments(tx, org.orgId);
+        await tx.query("update commerce_connections set last_synced_at = $3 where org_id = $1 and id = $2", [org.orgId, params.storeId, c.clock.now().toISOString()]);
+      });
+      out.imported = true;
+      return out;
+    },
+  });
+  route({
     method: "POST", path: "/api/orgs/:orgId/inventory-batches", summary: "Import stock batches with their shipping periods", tag: "Commerce",
     auth: { permission: "data.import" }, params: OrgParams, body: z.object({ batches: z.array(BatchImport).min(1).max(1000) }),
     handler: async ({ body, org }) => {
@@ -357,6 +384,26 @@ export function buildApp(c: Container): Router {
     method: "POST", path: "/api/orgs/:orgId/candidates/:candidateId/explain", summary: "Claude explains, from the stored evidence only, why this record is held (needs an API key)", tag: "Evidence",
     auth: { permission: "org.read" }, params: OrgParams.extend({ candidateId: uuid }),
     handler: async ({ params, org }) => explainCandidate({ ...c.deps, ai: c.ai }, { orgId: org.orgId, candidateId: params.candidateId }),
+  });
+
+  route({
+    method: "POST", path: "/api/orgs/:orgId/candidates/:candidateId/confirm-link", summary: "Make a link to send to the customer, asking for the batch code on their unit", tag: "Incidents",
+    auth: { permission: "candidate.decide" }, params: OrgParams.extend({ candidateId: uuid }),
+    handler: async ({ params, org, user }) => {
+      const { token } = await createConfirmLink(c.deps, { orgId: org.orgId, candidateId: params.candidateId, userId: user.id });
+      return { url: `${c.config.publicUrl}/?confirm=${token}` };
+    },
+  });
+  route({
+    method: "GET", path: "/api/public/confirm/:token", summary: "What a customer is asked through a confirmation link", tag: "Public", auth: "public",
+    params: z.object({ token: z.string().min(20).max(80) }), rateLimit: { max: 30, windowMs: 10 * 60_000 },
+    handler: async ({ params }) => confirmQuestion(c.deps, params.token),
+  });
+  route({
+    method: "POST", path: "/api/public/confirm/:token", summary: "A customer's answer. Stored as evidence; a member of staff still decides.", tag: "Public", auth: "public",
+    params: z.object({ token: z.string().min(20).max(80) }), body: z.object({ batchCode: z.string().trim().min(1).max(60) }),
+    rateLimit: { max: 10, windowMs: 10 * 60_000 },
+    handler: async ({ body, params }) => answerConfirm(c.deps, { token: params.token, batchCode: body.batchCode }),
   });
 
   // ---------- the Recovery Map ----------

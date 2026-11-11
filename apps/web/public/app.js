@@ -163,6 +163,18 @@ const orgUrl = () => `/api/orgs/${state.org.orgId}`;
 const incUrl = () => `${orgUrl()}/incidents/${state.incidentId}`;
 
 async function boot() {
+  const token = new URLSearchParams(location.search).get("confirm");
+  if (token) {
+    // A customer opened a confirmation link. They see one question and nothing else.
+    state.confirm = { token, question: null, error: null, done: false };
+    try {
+      state.confirm.question = await get(`/api/public/confirm/${encodeURIComponent(token)}`);
+    } catch (err) {
+      state.confirm.error = "This link has already been used, or is not valid.";
+    }
+    render();
+    return;
+  }
   try {
     state.me = await get("/api/me");
   } catch {
@@ -324,6 +336,10 @@ const reconcile = () => run(async () => {
   await refresh();
 }, "The payment is settled in your name, and the match was run again.");
 
+const makeLink = () => run(async () => {
+  state.detail.link = (await post(`${orgUrl()}/candidates/${state.detail.id}/confirm-link`)).url;
+});
+
 const explain = () => run(async () => {
   state.detail.explanation = await post(`${orgUrl()}/candidates/${state.detail.id}/explain`);
 });
@@ -348,10 +364,27 @@ const stageFault = (body) => run(async () => {
 function render() {
   const root = document.getElementById("app");
   const scroll = document.querySelector(".drawer") ? document.querySelector(".drawer").scrollTop : 0;
-  root.replaceChildren(...(state.me ? page() : [landing()]));
+  root.replaceChildren(...(state.confirm ? [buyerPage()] : state.me ? page() : [landing()]));
   if (state.busy > 0) root.append(h("div", { class: "busy", role: "progressbar", "aria-label": "Working" }));
   if (state.toast) root.append(h("div", { class: `toast ${state.toast.isError ? "err" : ""}`, role: "status" }, state.toast.message));
   if (document.querySelector(".drawer")) document.querySelector(".drawer").scrollTop = scroll;
+}
+
+function buyerPage() {
+  const c = state.confirm;
+  const send = () => run(async () => {
+    await post(`/api/public/confirm/${encodeURIComponent(c.token)}`, { batchCode: state.form.code || "" });
+    c.done = true;
+  });
+  return h("div", { class: "landing" },
+    c.error ? [h("h1", {}, "This link cannot be used"), h("p", { class: "lede" }, c.error)]
+    : c.done ? [h("h1", {}, "Thank you"), h("p", { class: "lede" }, `${c.question.merchant} has your answer. A member of their staff will check it and contact you about what happens next. You do not need to do anything else.`)]
+    : [h("h1", {}, "One question about your order"),
+       h("p", { class: "lede" }, `${c.question.merchant} is checking orders because of this: ${c.question.incident}.`),
+       h("p", {}, `Your order ${c.question.orderNumber || ""} included: ${c.question.product || "a product"}. Please find the batch code printed on the product or its box, and type it here exactly as printed.`),
+       h("label", { class: "field", style: "margin-top:18px;max-width:320px" }, h("span", {}, "Batch code"), h("input", { type: "text", autocomplete: "off", oninput: (e) => (state.form.code = e.target.value) })),
+       h("button", { class: "btn primary", onclick: send }, "Send"),
+       h("p", { class: "small muted", style: "margin-top:12px" }, "We ask only for the code. We will never ask for a password or payment details through this page.")]);
 }
 
 function landing() {
@@ -701,7 +734,10 @@ function confirmForm() {
     h("label", { class: "field" }, h("span", {}, "What are you relying on?"),
       h("select", { onchange: (e) => (state.form.basis = e.target.value) }, BASIS.map(([k, t]) => h("option", { value: k, selected: state.form.basis === k }, t)))),
     h("label", { class: "field" }, h("span", {}, "Note"), h("textarea", { placeholder: "For example: customer sent a photo of the label, B-2217", oninput: (e) => (state.form.note = e.target.value) })),
-    h("div", { class: "actions" }, h("button", { class: "btn primary", onclick: () => decideRecord("confirm") }, "Confirm this customer"), h("button", { class: "btn danger", onclick: () => decideRecord("decline") }, "Decline")));
+    h("div", { class: "actions" }, h("button", { class: "btn primary", onclick: () => decideRecord("confirm") }, "Confirm this customer"), h("button", { class: "btn danger", onclick: () => decideRecord("decline") }, "Decline"),
+      h("button", { class: "btn", onclick: makeLink }, "Make a link to ask the customer")),
+    state.detail.link && h("label", { class: "field", style: "margin-top:10px" }, h("span", {}, "Send this link to the customer. It works once. Their answer appears here as evidence; you still decide."),
+      h("input", { type: "text", readonly: true, value: state.detail.link, onfocus: (e) => e.target.select() })));
 }
 
 function reconcileForm(d) {
