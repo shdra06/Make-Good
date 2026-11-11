@@ -2,6 +2,22 @@
 
 Pay back many customers at once, correctly, through PayPal.
 
+> **Two things live in this folder.**
+>
+> 1. **The first prototype** (`src/`, `public/`): one process, a local file database, a mock PayPal. This README describes it. It still runs as before.
+> 2. **The platform rebuild** (`apps/api/`): a multi-tenant backend with a durable payment worker, built to the standard of real payment software. It has 82 passing tests. It has no web screens yet and has not been run against PayPal's sandbox.
+>
+> For the rebuild, read [docs/CHECKLIST.md](docs/CHECKLIST.md) (what is built and verified), [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/PAYPAL.md](docs/PAYPAL.md) and [docs/VERIFICATION.md](docs/VERIFICATION.md). To run it:
+>
+> ```bash
+> cd apps/api
+> npm install
+> npm test
+> npm start
+> ```
+>
+> Then, in a second terminal, `npm run smoke` walks a recall, a billing error and a currency report against the running server, using the built-in PayPal simulator.
+
 When a shop has to refund a lot of people (a faulty batch, a cancelled event, an overcharge, a double charge), Make Good finds who is owed money, says how sure it is about each customer, and sends the refunds after one approval.
 
 Built for the PayPal AI Hackathon 2026.
