@@ -9,6 +9,7 @@ import { openDb, type Db } from "./platform/db/db.ts";
 import { migrate } from "./platform/db/migrate.ts";
 import { JobRunner, type Job, type JobHandler } from "./platform/jobs/queue.ts";
 import { runDetectors } from "./modules/detection/service.ts";
+import { ClaudeEvidenceAi, type EvidenceAi } from "./modules/evidence/ai.ts";
 import { OperationExecutor } from "./modules/execution/executor.ts";
 import { FxService } from "./modules/fx/service.ts";
 import type { Deps as IdentityDeps } from "./modules/identity/service.ts";
@@ -21,6 +22,8 @@ export type Container = {
   db: Db;
   clock: Clock;
   deps: { db: Db; clock: Clock };
+  /** Claude, for reading evidence. Null when no API key is set: every AI step then says so and the rest works. */
+  ai: EvidenceAi | null;
   identity: IdentityDeps;
   secrets: SecretBox;
   connections: PayPalConnections;
@@ -30,7 +33,7 @@ export type Container = {
   handlers: Record<string, JobHandler>;
 };
 
-export type Overrides = { db?: Db; clock?: Clock; fetchImpl?: typeof fetch; passwordCost?: ScryptCost; workerId?: string };
+export type Overrides = { db?: Db; clock?: Clock; fetchImpl?: typeof fetch; passwordCost?: ScryptCost; workerId?: string; ai?: EvidenceAi | null };
 
 export async function createContainer(config: Config, overrides: Overrides = {}): Promise<Container> {
   const clock = overrides.clock ?? systemClock;
@@ -41,6 +44,8 @@ export async function createContainer(config: Config, overrides: Overrides = {})
 
   const secrets = new SecretBox({ k1: config.encryptionKey }, "k1");
   const deps = { db, clock };
+  const ai: EvidenceAi | null =
+    overrides.ai !== undefined ? overrides.ai : config.anthropicApiKey ? new ClaudeEvidenceAi({ apiKey: config.anthropicApiKey, model: config.model }) : null;
   const connections = new PayPalConnections({ db, clock, secrets, config, fetchImpl: overrides.fetchImpl });
   const executor = new OperationExecutor({ db, clock, providers: connections.resolve });
   const fx = new FxService({ db, clock, apiUrl: config.fxApiUrl, fetchImpl: overrides.fetchImpl });
@@ -70,7 +75,7 @@ export async function createContainer(config: Config, overrides: Overrides = {})
   });
 
   return {
-    config, db, clock, deps, secrets, connections, executor, fx, runner, handlers,
+    config, db, clock, deps, ai, secrets, connections, executor, fx, runner, handlers,
     identity: { db, clock, passwordCost: overrides.passwordCost },
   };
 }

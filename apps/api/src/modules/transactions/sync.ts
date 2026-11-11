@@ -274,3 +274,97 @@ export async function linkOrdersToPayments(q: Queryable, orgId: string): Promise
   );
   return { exact: exact.length, heuristic: heuristic.length };
 }
+
+/**
+ * Asks PayPal, payment by payment, whether a dispute is open on the payments
+ * an incident might refund, and records the answer. Refunding a payment that
+ * is in a dispute could pay the customer twice, so the match must know.
+ *
+ * A failure here is reported, never hidden: the caller can show that the
+ * dispute state could not be checked.
+ */
+export async function refreshDisputeStates(
+  deps: { db: Db; clock: Clock },
+  input: { orgId: string; incidentId: string; provider: PayPalProvider; limit?: number },
+): Promise<{ checked: number; open: number; changed: number; failed: string | null }> {
+  const payments = await deps.db.query<{ id: string; transaction_id: string; dispute_state: string | null }>(
+    `select distinct p.id, p.transaction_id, p.dispute_state
+       from candidates c join payment_transactions p on p.org_id = c.org_id and p.id = c.payment_transaction_id
+      where c.org_id = $1 and c.incident_id = $2 and c.status <> 'cleared' and p.environment = $3
+      order by p.transaction_id limit $4`,
+    [input.orgId, input.incidentId, input.provider.environment, input.limit ?? 500],
+  );
+  const result = { checked: 0, open: 0, changed: 0, failed: null as string | null };
+  for (const p of payments) {
+    let disputes;
+    try {
+      disputes = await input.provider.listDisputesForTransaction(p.transaction_id);
+    } catch (err) {
+      result.failed = `PayPal did not answer the dispute check for ${p.transaction_id}: ${err instanceof Error ? err.message : String(err)}`;
+      break;
+    }
+    result.checked++;
+    const resolved = (d: { status?: string; dispute_state?: string }) =>
+      (d.status ?? "").toUpperCase() === "RESOLVED" || (d.dispute_state ?? "").toUpperCase() === "RESOLVED";
+    const state = disputes.some((d) => !resolved(d)) ? "open" : disputes.length > 0 ? "resolved" : null;
+    if (state === "open") result.open++;
+    if (state !== p.dispute_state) {
+      await deps.db.query("update payment_transactions set dispute_state = $3, last_synced_at = $4 where org_id = $1 and id = $2", [
+        input.orgId, p.id, state, deps.clock.now().toISOString(),
+      ]);
+      result.changed++;
+    }
+  }
+  return result;
+}
+
+/**
+ * Fetches named PayPal payments by ID. For a merchant without Transaction
+ * Search who knows which payments matter (for example from the activity
+ * export in the PayPal dashboard). Each one is read from PayPal, never taken
+ * on trust.
+ */
+export async function lookupPaymentsByIds(
+  deps: { db: Db; clock: Clock },
+  input: { orgId: string; connectionId: string; provider: PayPalProvider; captureIds: string[] },
+): Promise<{ looked: number; found: number; notFound: string[] }> {
+  const result = { looked: input.captureIds.length, found: 0, notFound: [] as string[] };
+  for (const id of input.captureIds) {
+    let capture;
+    try {
+      capture = await input.provider.getCapture(id);
+    } catch (err) {
+      const status = (err as { httpStatus?: number | null }).httpStatus;
+      if ((err as { kind?: string }).kind === "rejected" && (status === 404 || status === 422 || status === 400)) {
+        result.notFound.push(id);
+        continue;
+      }
+      throw err;
+    }
+    let gross: number;
+    try {
+      gross = toMinor(capture.amount.value, capture.amount.currency_code);
+    } catch {
+      result.notFound.push(id);
+      continue;
+    }
+    await deps.db.query(
+      `insert into payment_transactions
+         (org_id, paypal_connection_id, environment, transaction_id, kind, provider_status, occurred_at, currency,
+          gross_minor, refunded_minor, invoice_id, custom_id, source, raw, last_synced_at)
+       values ($1,$2,$3,$4,'payment',$5,$6,$7,$8,$9,$10,$11,'api_lookup',$12::jsonb,$13)
+       on conflict (org_id, provider, environment, transaction_id) do update set
+         provider_status = excluded.provider_status, last_synced_at = excluded.last_synced_at,
+         refunded_minor = greatest(payment_transactions.refunded_minor, excluded.refunded_minor)`,
+      [
+        input.orgId, input.connectionId, input.provider.environment, capture.id, capture.status,
+        capture.create_time ?? deps.clock.now().toISOString(), capture.amount.currency_code, gross,
+        capture.status === "REFUNDED" ? gross : 0, capture.invoice_id ?? null, capture.custom_id ?? null,
+        json(capture), deps.clock.now().toISOString(),
+      ],
+    );
+    result.found++;
+  }
+  await deps.db.tx((tx) => linkOrdersToPayments(tx, input.orgId));
+  return result;
+}

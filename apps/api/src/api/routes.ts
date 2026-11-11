@@ -7,9 +7,12 @@ import { DAY } from "../platform/clock.ts";
 import { ConflictError, NotFoundError, ValidationError } from "../platform/errors.ts";
 import { enqueue } from "../platform/jobs/queue.ts";
 import { BatchImport, OrderImport, upsertBatch, upsertOrder } from "../modules/commerce/ingest.ts";
-import { seedDemoData } from "../modules/demo/seed.ts";
+import { seedDemoData, seedRecallScenario } from "../modules/demo/seed.ts";
 import { convertDetection, DETECTORS, runDetectors, setDetectionStatus } from "../modules/detection/service.ts";
-import { cancelBatch, createBatch, decideBatch, pauseBatch, previewBatch, resumeBatch, startBatch, submitBatch } from "../modules/execution/batches.ts";
+import { evaluateIncident } from "../modules/evaluation/service.ts";
+import { AcceptExtraction, acceptExtraction, addDocument, decideAlias, explainCandidate, extractDocument, listEvidence, NewDocument, suggestAliases } from "../modules/evidence/service.ts";
+import { cancelBatch, createBatch, decideBatch, pauseBatch, previewBatch, resumeBatch, reviseBatch, startBatch, submitBatch } from "../modules/execution/batches.ts";
+import { currentManifest, manifestByVersion, manifestCsv } from "../modules/execution/manifests.ts";
 import {
   createOrganisation,
   Credentials,
@@ -26,10 +29,11 @@ import {
   signOut,
   updateOrgSettings,
 } from "../modules/identity/service.ts";
-import { addRuleVersion, createIncident, decideCandidates, NewIncident, NewRuleVersion, runIncidentMatch } from "../modules/incidents/service.ts";
+import { addRuleVersion, createIncident, decideCandidates, DecisionBasis, NewIncident, NewRuleVersion, reconcilePayment, runIncidentMatch } from "../modules/incidents/service.ts";
 import { receivePayPalWebhook } from "../modules/paypal/webhooks.ts";
+import { comparePolicies, PolicyInput, recoveryMap } from "../modules/recovery/map.ts";
 import * as reports from "../modules/reporting/queries.ts";
-import { linkOrdersToPayments, lookupPaymentsByReference } from "../modules/transactions/sync.ts";
+import { linkOrdersToPayments, lookupPaymentsByIds, lookupPaymentsByReference, refreshDisputeStates } from "../modules/transactions/sync.ts";
 import { createRouter, OrgParams, Paging, parseCookies, SESSION_COOKIE, sessionCookie, uuid, type Router } from "./http.ts";
 
 const Incident = OrgParams.extend({ incidentId: uuid });
@@ -89,7 +93,8 @@ export function buildApp(c: Container): Router {
         simulatorAllowed: c.config.allowSimulator,
         livePayPalAllowed: c.config.allowLivePayPal,
         partnerOnboardingAvailable: c.config.paypalPartner !== null,
-        aiConfigured: c.config.anthropicApiKey !== null,
+        aiConfigured: c.ai !== null,
+        aiModel: c.ai?.model ?? null,
         emailTransport: c.config.email.transport,
         environment: c.config.env,
       },
@@ -186,12 +191,16 @@ export function buildApp(c: Container): Router {
     },
   });
   route({
-    method: "POST", path: "/api/orgs/:orgId/paypal/lookup-payments", summary: "Fetch from PayPal, by ID, the payments that orders name and we do not hold yet", tag: "PayPal",
+    method: "POST", path: "/api/orgs/:orgId/paypal/lookup-payments", summary: "Fetch from PayPal, by ID, the payments that orders name (or the IDs given) and we do not hold yet", tag: "PayPal",
     auth: { permission: "data.import" }, params: OrgParams,
-    handler: async ({ org }) => {
+    body: z.object({ captureIds: z.array(z.string().min(5).max(40)).max(200).optional() }),
+    handler: async ({ body, org }) => {
       const active = await c.connections.active(org.orgId);
       if (!active) throw new ConflictError("NO_PAYPAL_CONNECTION", "Connect a PayPal account first.");
       const provider = await c.connections.resolve(org.orgId, active.id);
+      if (body.captureIds && body.captureIds.length > 0) {
+        return lookupPaymentsByIds(c.deps, { orgId: org.orgId, connectionId: active.id, provider, captureIds: body.captureIds });
+      }
       return lookupPaymentsByReference(c.deps, { orgId: org.orgId, connectionId: active.id, provider });
     },
   });
@@ -295,13 +304,23 @@ export function buildApp(c: Container): Router {
     auth: { permission: "incident.write" }, params: Incident,
     handler: async ({ params, org, user }) => {
       const active = await c.connections.active(org.orgId);
-      return runIncidentMatch(c.deps, { orgId: org.orgId, incidentId: params.incidentId, userId: user.id, payoutsAvailable: active?.capabilities.payouts === true });
+      const run = () => runIncidentMatch(c.deps, { orgId: org.orgId, incidentId: params.incidentId, userId: user.id, payoutsAvailable: active?.capabilities.payouts === true });
+      const first = await run();
+      if (!active) return { ...first, disputes: null };
+      // A refund on a payment that is in a dispute could pay the customer twice, so PayPal is asked before anyone is called payable.
+      const provider = await c.connections.resolve(org.orgId, active.id);
+      const disputes = await refreshDisputeStates(c.deps, { orgId: org.orgId, incidentId: params.incidentId, provider });
+      return { ...(disputes.changed > 0 ? await run() : first), disputes };
     },
   });
   route({
-    method: "GET", path: "/api/orgs/:orgId/incidents/:incidentId/candidates", summary: "Affected customers, with classification and amount", tag: "Incidents",
+    method: "GET", path: "/api/orgs/:orgId/incidents/:incidentId/candidates", summary: "Customer records with both answers (payment identity, eligibility), where each stands, and the amount", tag: "Incidents",
     auth: { permission: "org.read" }, params: Incident,
-    query: Paging.extend({ classification: z.string().max(40).optional(), status: z.string().max(20).optional(), search: z.string().max(200).optional() }),
+    query: Paging.extend({
+      classification: z.string().max(40).optional(), status: z.string().max(20).optional(), search: z.string().max(200).optional(),
+      disposition: z.string().max(40).optional(), decision: z.string().max(40).optional(), paymentIdentity: z.string().max(20).optional(),
+      eligibility: z.string().max(20).optional(), includeCleared: z.enum(["true", "false"]).transform((v) => v === "true").optional(),
+    }),
     handler: async ({ params, query, org }) => reports.listCandidates(c.db, org.orgId, params.incidentId, query, reports.pageOf(query.page, query.size)),
   });
   route({
@@ -316,8 +335,85 @@ export function buildApp(c: Container): Router {
   route({
     method: "POST", path: "/api/orgs/:orgId/incidents/:incidentId/candidates/decide", summary: "Confirm or decline customers that needed a decision", tag: "Incidents",
     auth: { permission: "candidate.decide" }, params: Incident,
-    body: z.object({ candidateIds: z.array(uuid).min(1).max(1000), decision: z.enum(["confirm", "decline"]) }),
+    body: z.object({
+      candidateIds: z.array(uuid).min(1).max(1000), decision: z.enum(["confirm", "decline"]),
+      /** What the person relied on. Stored as evidence in their name and shown on the payment list. */
+      basis: DecisionBasis.optional(), note: z.string().trim().max(1000).optional(),
+    }),
     handler: async ({ body, params, org, user }) => decideCandidates(c.deps, { ...body, orgId: org.orgId, incidentId: params.incidentId, userId: user.id }),
+  });
+  route({
+    method: "POST", path: "/api/orgs/:orgId/candidates/:candidateId/reconcile-payment", summary: "A named person settles which PayPal payment paid for the order, then the match runs again", tag: "Incidents",
+    auth: { permission: "candidate.decide" }, params: OrgParams.extend({ candidateId: uuid }),
+    body: z.object({ paymentTransactionId: uuid, note: z.string().trim().min(3).max(500) }),
+    handler: async ({ body, params, org, user }) => {
+      const settled = await reconcilePayment(c.deps, { orgId: org.orgId, candidateId: params.candidateId, userId: user.id, ...body });
+      const active = await c.connections.active(org.orgId);
+      const match = await runIncidentMatch(c.deps, { orgId: org.orgId, incidentId: settled.incidentId, userId: user.id, payoutsAvailable: active?.capabilities.payouts === true });
+      return { ...settled, match };
+    },
+  });
+  route({
+    method: "POST", path: "/api/orgs/:orgId/candidates/:candidateId/explain", summary: "Claude explains, from the stored evidence only, why this record is held (needs an API key)", tag: "Evidence",
+    auth: { permission: "org.read" }, params: OrgParams.extend({ candidateId: uuid }),
+    handler: async ({ params, org }) => explainCandidate({ ...c.deps, ai: c.ai }, { orgId: org.orgId, candidateId: params.candidateId }),
+  });
+
+  // ---------- the Recovery Map ----------
+
+  route({
+    method: "GET", path: "/api/orgs/:orgId/incidents/:incidentId/recovery-map", summary: "Everyone who bought the product: where each record stands, why, and what is owed", tag: "Recovery Map",
+    auth: { permission: "org.read" }, params: Incident,
+    handler: async ({ params, org }) => recoveryMap(c.db, org.orgId, params.incidentId),
+  });
+  route({
+    method: "POST", path: "/api/orgs/:orgId/incidents/:incidentId/policies/compare", summary: "Price compensation policies against the records. A dry calculation: nothing is saved or paid.", tag: "Recovery Map",
+    auth: { permission: "org.read" }, params: Incident, body: z.object({ policies: z.array(PolicyInput).max(6).optional() }),
+    handler: async ({ body, params, org }) => {
+      const active = await c.connections.active(org.orgId);
+      return comparePolicies(c.deps, { orgId: org.orgId, incidentId: params.incidentId, policies: body.policies, payoutsAvailable: active?.capabilities.payouts === true });
+    },
+  });
+  route({
+    method: "GET", path: "/api/orgs/:orgId/incidents/:incidentId/evaluation", summary: "Accuracy against known answers. Only available for sample data whose right answers are stored.", tag: "Recovery Map",
+    auth: { permission: "org.read" }, params: Incident,
+    handler: async ({ params, org }) => evaluateIncident(c.db, org.orgId, params.incidentId),
+  });
+
+  // ---------- incident evidence ----------
+
+  route({
+    method: "GET", path: "/api/orgs/:orgId/incidents/:incidentId/evidence", summary: "Documents attached to the incident and what was read from them", tag: "Evidence",
+    auth: { permission: "org.read" }, params: Incident,
+    handler: async ({ params, org }) => listEvidence({ ...c.deps, ai: c.ai }, org.orgId, params.incidentId),
+  });
+  route({
+    method: "POST", path: "/api/orgs/:orgId/incidents/:incidentId/documents", summary: "Attach a document, such as a supplier's recall notice, as text", tag: "Evidence",
+    auth: { permission: "incident.write" }, params: Incident, body: NewDocument,
+    handler: async ({ body, params, org, user }) => addDocument({ ...c.deps, ai: c.ai }, { ...body, orgId: org.orgId, incidentId: params.incidentId, userId: user.id }),
+  });
+  route({
+    method: "POST", path: "/api/orgs/:orgId/incidents/:incidentId/documents/:documentId/extract", summary: "Read products, batches, dates and remedy out of a document. Every field quotes the document. Nothing is applied.", tag: "Evidence",
+    auth: { permission: "incident.write" }, params: Incident.extend({ documentId: uuid }),
+    body: z.object({ method: z.enum(["auto", "pattern_rules", "claude"]).default("auto") }),
+    handler: async ({ body, params, org, user }) =>
+      extractDocument({ ...c.deps, ai: c.ai }, { orgId: org.orgId, incidentId: params.incidentId, documentId: params.documentId, userId: user.id, method: body.method }),
+  });
+  route({
+    method: "POST", path: "/api/orgs/:orgId/incidents/:incidentId/extractions/:extractionId/accept", summary: "A person saves rules after checking what was read from a document", tag: "Evidence",
+    auth: { permission: "incident.write" }, params: Incident.extend({ extractionId: uuid }), body: AcceptExtraction,
+    handler: async ({ body, params, org, user }) =>
+      acceptExtraction({ ...c.deps, ai: c.ai }, { ...body, orgId: org.orgId, incidentId: params.incidentId, extractionId: params.extractionId, userId: user.id }),
+  });
+  route({
+    method: "POST", path: "/api/orgs/:orgId/incidents/:incidentId/aliases/suggest", summary: "Find order lines whose product code looks like one in scope but is not matched. Suggestions change nothing.", tag: "Evidence",
+    auth: { permission: "incident.write" }, params: Incident, body: z.object({ withAi: z.boolean().default(true) }),
+    handler: async ({ body, params, org }) => suggestAliases({ ...c.deps, ai: c.ai }, { orgId: org.orgId, incidentId: params.incidentId, withAi: body.withAi }),
+  });
+  route({
+    method: "POST", path: "/api/orgs/:orgId/aliases/:aliasId/decision", summary: "A person confirms or rejects a product-code alias", tag: "Evidence",
+    auth: { permission: "incident.write" }, params: OrgParams.extend({ aliasId: uuid }), body: z.object({ decision: z.enum(["confirm", "reject"]) }),
+    handler: async ({ body, params, org, user }) => decideAlias({ ...c.deps, ai: c.ai }, { orgId: org.orgId, aliasId: params.aliasId, userId: user.id, decision: body.decision }),
   });
   route({
     method: "POST", path: "/api/orgs/:orgId/incidents/:incidentId/status", summary: "Close or cancel an incident", tag: "Incidents",
@@ -340,13 +436,54 @@ export function buildApp(c: Container): Router {
 
   route({
     method: "GET", path: "/api/orgs/:orgId/incidents/:incidentId/preview", summary: "Dry run: what a batch would pay, with no money moved and nothing saved", tag: "Batches",
-    auth: { permission: "org.read" }, params: Incident,
-    handler: async ({ params, org }) => previewBatch(c.db, org.orgId, params.incidentId),
+    auth: { permission: "org.read" }, params: Incident, query: z.object({ kind: z.enum(["refund", "payout"]).default("refund") }),
+    handler: async ({ params, query, org }) => previewBatch(c.db, org.orgId, params.incidentId, { kind: query.kind }),
   });
   route({
     method: "POST", path: "/api/orgs/:orgId/incidents/:incidentId/batches", summary: "Create a batch from the confirmed customers", tag: "Batches",
-    auth: { permission: "batch.create" }, params: Incident, body: z.object({ name: z.string().trim().min(2).max(120) }),
-    handler: async ({ body, params, org, user }) => createBatch(c.deps, { orgId: org.orgId, incidentId: params.incidentId, userId: user.id, name: body.name }),
+    auth: { permission: "batch.create" }, params: Incident,
+    body: z.object({ name: z.string().trim().min(2).max(120), kind: z.enum(["refund", "payout"]).default("refund") }),
+    handler: async ({ body, params, org, user }) => createBatch(c.deps, { orgId: org.orgId, incidentId: params.incidentId, userId: user.id, name: body.name, kind: body.kind }),
+  });
+  route({
+    method: "POST", path: "/api/orgs/:orgId/batches/:batchId/revise", summary: "Build the next version of a draft batch's payment list from the records as they are now", tag: "Batches",
+    auth: { permission: "batch.create" }, params: Batch,
+    handler: async ({ params, org, user }) => reviseBatch(c.deps, { orgId: org.orgId, batchId: params.batchId, userId: user.id }),
+  });
+  route({
+    method: "GET", path: "/api/orgs/:orgId/batches/:batchId/manifest", summary: "The exact payment list an approval covers: recipients, amounts, PayPal references, rules and evidence", tag: "Batches",
+    auth: { permission: "org.read" }, params: Batch,
+    query: z.object({ version: z.coerce.number().int().min(1).optional(), format: z.enum(["json", "csv"]).default("json") }),
+    handler: async ({ params, query, org, reply }) => {
+      const manifest = query.version
+        ? await manifestByVersion(c.db, org.orgId, params.batchId, query.version)
+        : await currentManifest(c.db, org.orgId, params.batchId);
+      if (!manifest) throw new NotFoundError(query.version ? "That version of the payment list" : "A payment list in force for this batch");
+      if (query.format === "csv") {
+        reply.header("Content-Type", "text/csv; charset=utf-8");
+        reply.header("Content-Disposition", `attachment; filename="payment-list-v${manifest.version}-${manifest.content_hash.slice(0, 12)}.csv"`);
+        return manifestCsv(manifest.content, manifest.content_hash);
+      }
+      return {
+        id: manifest.id, version: manifest.version, status: manifest.status, contentHash: manifest.content_hash, itemCount: manifest.item_count,
+        createdAt: manifest.created_at, invalidatedAt: manifest.invalidated_at, invalidatedBecause: manifest.invalidated_reason, content: manifest.content,
+      };
+    },
+  });
+  route({
+    method: "GET", path: "/api/orgs/:orgId/ledger", summary: "The refund-intent ledger: every planned movement of money, why, under which approval, and what PayPal said", tag: "Batches",
+    auth: { permission: "org.read" }, params: OrgParams,
+    query: Paging.extend({ incidentId: uuid.optional(), captureId: z.string().max(40).optional(), state: z.string().max(30).optional() }),
+    handler: async ({ query, org }) => reports.ledger(c.db, org.orgId, query, reports.pageOf(query.page, query.size)),
+  });
+  route({
+    method: "GET", path: "/api/orgs/:orgId/ledger/captures/:captureId", summary: "One PayPal payment across every incident: refunded, reserved and still available", tag: "Batches",
+    auth: { permission: "org.read" }, params: OrgParams.extend({ captureId: z.string().min(5).max(40) }),
+    handler: async ({ params, org }) => {
+      const balance = await reports.captureBalance(c.db, org.orgId, params.captureId);
+      if (!balance) throw new NotFoundError("PayPal payment");
+      return balance;
+    },
   });
   route({
     method: "GET", path: "/api/orgs/:orgId/batches", summary: "Batches and their progress", tag: "Batches", auth: { permission: "org.read" }, params: OrgParams,
@@ -470,6 +607,11 @@ export function buildApp(c: Container): Router {
   route({
     method: "POST", path: "/api/orgs/:orgId/demo/seed", summary: "Load sample data (simulator connections only)", tag: "Demo", auth: { permission: "org.manage" }, params: OrgParams,
     handler: async ({ org, user }) => seedDemoData({ db: c.db, clock: c.clock, connections: c.connections }, { orgId: org.orgId, userId: user.id }),
+  });
+  route({
+    method: "POST", path: "/api/orgs/:orgId/demo/recall-scenario", summary: "Load the HM-300 batch-recall case: untidy synthetic records with known answers (simulator connections only)", tag: "Demo",
+    auth: { permission: "org.manage" }, params: OrgParams,
+    handler: async ({ org, user }) => seedRecallScenario({ db: c.db, clock: c.clock, connections: c.connections }, { orgId: org.orgId, userId: user.id }),
   });
 
   // ---------- PayPal webhooks ----------

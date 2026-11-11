@@ -18,6 +18,7 @@ import { fromMinor } from "../../platform/money.ts";
 import { OrderImport, upsertBatch, upsertOrder } from "../commerce/ingest.ts";
 import type { PayPalConnections } from "../paypal/connections.ts";
 import { syncTransactions } from "../transactions/sync.ts";
+import { buildRecallScenario, loadRecallScenario, RECALL_STORE_NAME } from "./recall-scenario.ts";
 
 export const DEMO_STORE_NAME = "Demo store (sample data)";
 
@@ -162,4 +163,42 @@ export async function seedDemoData(
     });
   });
   return { orders, payments, batches: batches.length };
+}
+
+/**
+ * Loads the flagship test case on a simulator connection: a supplier recall
+ * of one batch of the HM-300 hand mixer, with deliberately untidy records and
+ * the right answer stored for each. See recall-scenario.ts.
+ */
+export async function seedRecallScenario(
+  deps: { db: Db; clock: Clock; connections: PayPalConnections },
+  input: { orgId: string; userId: string },
+): Promise<{ incidentId: string; documentId: string; orders: number; payments: number; labels: number; skipped: Array<{ caseTag: string; why: string }> }> {
+  const { db, clock, connections } = deps;
+  const active = await connections.active(input.orgId);
+  if (!active || active.environment !== "simulator") {
+    throw new ConflictError("NOT_SIMULATOR", "This sample case can only be loaded here on a simulator connection. To run it on the PayPal sandbox, use `npm run sandbox:recall`.");
+  }
+  const existing = await db.query("select 1 from commerce_connections where org_id = $1 and name = $2", [input.orgId, RECALL_STORE_NAME]);
+  if (existing.length > 0) throw new ConflictError("ALREADY_SEEDED", "The recall case is already loaded for this organisation.");
+  const sim = await connections.simulatorFor(input.orgId);
+  const now = clock.now();
+  const data = await buildRecallScenario({
+    mode: "simulator", now, prefix: "#", provider: sim,
+    pay: async (request) => {
+      const capture = sim.addCapture({
+        amountMinor: request.amountMinor, currency: request.currency, createdAt: request.at, invoiceId: request.invoiceId ?? undefined,
+        payerEmail: request.payer.email, payerName: request.payer.name, payerId: `SIMPAYER${request.key.replace(/[^A-Za-z0-9]/g, "").toUpperCase()}`,
+        payerCountry: "US", items: [{ code: request.item.sku, name: request.item.title, quantity: request.item.quantity, unitMinor: request.item.unitMinor }],
+      });
+      return { captureId: capture.id, createdAt: capture.createdAt };
+    },
+    openDispute: (captureId) => {
+      const capture = sim.captures.get(captureId);
+      if (capture) capture.disputed = true;
+    },
+  });
+  const loaded = await loadRecallScenario({ db, clock }, { orgId: input.orgId, userId: input.userId, data });
+  const stats = await syncTransactions({ db, clock }, { orgId: input.orgId, connectionId: active.id, provider: sim, from: new Date(now.getTime() - 120 * DAY), to: now });
+  return { incidentId: loaded.incidentId, documentId: loaded.documentId, orders: loaded.orders, payments: stats.payments, labels: loaded.labels, skipped: data.skipped };
 }
