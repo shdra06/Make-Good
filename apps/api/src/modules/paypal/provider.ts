@@ -208,9 +208,13 @@ export type RefundRejection =
   | { policy: "needs_merchant"; meaning: string; pauseBatch: boolean };
 
 /**
- * What a refund rejection means for the operation. Issue names are PayPal's
- * (Payments v2 error reference). An issue we do not know is treated as final:
- * we never guess that a refused refund is safe to retry automatically.
+ * What a refund rejection means for the operation. An issue we do not know is
+ * treated as final: we never guess that a refused refund is safe to retry.
+ *
+ * Seen from the real sandbox on 11 Nov 2026 (scripts/sandbox-verify.ts):
+ * CAPTURE_FULLY_REFUNDED, REFUND_AMOUNT_EXCEEDED, DECIMAL_PRECISION and
+ * REFUND_CAPTURE_CURRENCY_MISMATCH, all with HTTP 422. The other names are
+ * from PayPal's error reference and have not been triggered by us.
  */
 export function classifyRefundRejection(issue: string | null): RefundRejection {
   switch (issue) {
@@ -224,6 +228,7 @@ export function classifyRefundRejection(issue: string | null): RefundRejection {
     case "TRANSACTION_DISPUTED":
     case "REFUND_NOT_PERMITTED_DUE_TO_CHARGEBACK":
       return { policy: "final", meaning: "The payment is in a dispute or chargeback. Resolve it in PayPal first." };
+    case "REFUND_CAPTURE_CURRENCY_MISMATCH": // the name the sandbox returned on 11 Nov 2026
     case "CURRENCY_MISMATCH":
     case "INVALID_CURRENCY_CODE":
     case "DECIMAL_PRECISION":

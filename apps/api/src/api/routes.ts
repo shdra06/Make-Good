@@ -29,7 +29,7 @@ import {
 import { addRuleVersion, createIncident, decideCandidates, NewIncident, NewRuleVersion, runIncidentMatch } from "../modules/incidents/service.ts";
 import { receivePayPalWebhook } from "../modules/paypal/webhooks.ts";
 import * as reports from "../modules/reporting/queries.ts";
-import { linkOrdersToPayments } from "../modules/transactions/sync.ts";
+import { linkOrdersToPayments, lookupPaymentsByReference } from "../modules/transactions/sync.ts";
 import { createRouter, OrgParams, Paging, parseCookies, SESSION_COOKIE, sessionCookie, uuid, type Router } from "./http.ts";
 
 const Incident = OrgParams.extend({ incidentId: uuid });
@@ -171,12 +171,28 @@ export function buildApp(c: Container): Router {
     handler: async ({ body, org }) => {
       const active = await c.connections.active(org.orgId);
       if (!active) throw new ConflictError("NO_PAYPAL_CONNECTION", "Connect a PayPal account first.");
+      if (active.capabilities.transactionSearch === false) {
+        throw new ConflictError(
+          "TRANSACTION_SEARCH_NOT_ENABLED",
+          "PayPal has not given this app the Transaction Search permission. Switch it on for the app in the PayPal developer dashboard, then check the connection again. Until then, payments that orders name can still be fetched one by one.",
+        );
+      }
       const now = c.clock.now();
       const jobId = await enqueue(c.db, {
         type: "paypal.sync", orgId: org.orgId, dedupeKey: `paypal.sync:${org.orgId}`,
         payload: { connectionId: active.id, from: new Date(now.getTime() - body.days * DAY).toISOString(), to: now.toISOString() },
       }, now);
       return { queued: jobId !== null, alreadyRunning: jobId === null };
+    },
+  });
+  route({
+    method: "POST", path: "/api/orgs/:orgId/paypal/lookup-payments", summary: "Fetch from PayPal, by ID, the payments that orders name and we do not hold yet", tag: "PayPal",
+    auth: { permission: "data.import" }, params: OrgParams,
+    handler: async ({ org }) => {
+      const active = await c.connections.active(org.orgId);
+      if (!active) throw new ConflictError("NO_PAYPAL_CONNECTION", "Connect a PayPal account first.");
+      const provider = await c.connections.resolve(org.orgId, active.id);
+      return lookupPaymentsByReference(c.deps, { orgId: org.orgId, connectionId: active.id, provider });
     },
   });
   route({

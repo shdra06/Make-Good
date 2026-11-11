@@ -9,6 +9,7 @@ import { verifyAuditChain } from "../src/platform/audit.ts";
 import { HOUR, MINUTE } from "../src/platform/clock.ts";
 import { enqueue } from "../src/platform/jobs/queue.ts";
 import { cancelBatch, createBatch, decideBatch, previewBatch, resumeBatch, startBatch, submitBatch } from "../src/modules/execution/batches.ts";
+import { lookupPaymentsByReference } from "../src/modules/transactions/sync.ts";
 import { scenario } from "./scenario.ts";
 
 test("happy path: three affected customers are found, approved and refunded once each", async () => {
@@ -375,6 +376,28 @@ test("payments older than 180 days are paid by payout, once, even when the reply
   assert.ok(op!.provider_payout_item_id);
   assert.equal(s.paypal.payouts.size, 1, "one payout, not two");
   assert.equal(s.paypal.captures.get(old.captureId!)!.refundedMinor, 0, "the old payment itself is not refunded");
+});
+
+test("a payment made minutes ago is fetched by its ID, without waiting for transaction search", async () => {
+  const s = await scenario();
+  const a = await s.sell();
+  const gone = await s.sell();
+  s.paypal.captures.delete(gone.captureId!); // the store recorded an ID PayPal does not know
+  const looked = await lookupPaymentsByReference(s.deps, { orgId: s.orgId, connectionId: s.connectionId, provider: s.paypal });
+  assert.deepEqual({ looked: looked.looked, found: looked.found }, { looked: 2, found: 1 });
+  assert.deepEqual(looked.notFound, [gone.captureId]);
+  assert.equal(s.paypal.calls.filter((c) => c.op === "search").length, 0, "transaction search was not used");
+
+  const incidentId = await s.incident();
+  const result = await s.match(incidentId);
+  assert.equal(result.autoConfirmed, 1, "the order whose payment was found can be paid");
+  assert.equal(result.needConfirmation, 1, "the other is flagged: its payment could not be found");
+  const { batchId } = await s.approvedBatch(incidentId);
+  await s.settle();
+  assert.deepEqual((await s.operations(batchId)).map((o) => o.state), ["succeeded"]);
+  assert.equal(s.paypal.captures.get(a.captureId!)!.refundedMinor, 5900);
+  // Looking again fetches nothing new.
+  assert.equal((await lookupPaymentsByReference(s.deps, { orgId: s.orgId, connectionId: s.connectionId, provider: s.paypal })).found, 0);
 });
 
 test("without payouts allowed, an old payment is left for a person and is not in the batch", async () => {

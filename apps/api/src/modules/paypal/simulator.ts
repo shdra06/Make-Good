@@ -207,7 +207,7 @@ export class SimulatedPayPal implements PayPalProvider {
 
   #capture(captureId: string): SimCapture {
     const capture = this.captures.get(captureId);
-    if (!capture) this.#reject("RESOURCE_NOT_FOUND", "The capture does not exist.", 404);
+    if (!capture) this.#reject("INVALID_RESOURCE_ID", "The capture does not exist.", 404);
     return capture;
   }
 
@@ -256,7 +256,7 @@ export class SimulatedPayPal implements PayPalProvider {
       const capture = this.#capture(captureId);
       const left = capture.amountMinor - capture.refundedMinor;
       if (input.amount && input.amount.currency_code !== capture.currency) {
-        this.#reject("CURRENCY_MISMATCH", "The refund currency must match the capture currency.");
+        this.#reject("REFUND_CAPTURE_CURRENCY_MISMATCH", "The refund currency must match the capture currency.");
       }
       const amountMinor = input.amount ? toMinor(input.amount.value, capture.currency) : left;
       if (capture.disputed) this.#reject("TRANSACTION_DISPUTED", "The capture is in a dispute.");
@@ -445,7 +445,7 @@ export class FaultInjectingProvider implements PayPalProvider {
   readonly #inner: PayPalProvider;
   #dropNext = 0;
   /** What was injected, for the audit trail of the demonstration. */
-  readonly injected: Array<{ op: "refund" | "payout"; requestId: string; at: string }> = [];
+  readonly injected: Array<{ op: "refund" | "payout"; requestId: string; at: string; providerId: string }> = [];
 
   constructor(inner: PayPalProvider) {
     this.#inner = inner;
@@ -457,10 +457,11 @@ export class FaultInjectingProvider implements PayPalProvider {
     this.#dropNext += count;
   }
 
-  #maybeDrop(op: "refund" | "payout", requestId: string): void {
+  /** `providerId` is what PayPal really created, kept so the test can prove the later answer is the same one. */
+  #maybeDrop(op: "refund" | "payout", requestId: string, providerId: string): void {
     if (this.#dropNext <= 0) return;
     this.#dropNext -= 1;
-    this.injected.push({ op, requestId, at: new Date().toISOString() });
+    this.injected.push({ op, requestId, at: new Date().toISOString(), providerId });
     throw new ProviderError({
       kind: "timeout",
       message: "Injected fault: the request reached PayPal, and the reply was discarded on purpose.",
@@ -475,7 +476,7 @@ export class FaultInjectingProvider implements PayPalProvider {
   }
   async refundCapture(captureId: string, input: RefundInput) {
     const result = await this.#inner.refundCapture(captureId, input);
-    this.#maybeDrop("refund", input.requestId);
+    this.#maybeDrop("refund", input.requestId, result.id);
     return result;
   }
   getRefund(refundId: string) {
@@ -486,7 +487,7 @@ export class FaultInjectingProvider implements PayPalProvider {
   }
   async createPayout(input: { senderBatchId: string; emailSubject: string; items: PayoutItemInput[] }) {
     const result = await this.#inner.createPayout(input);
-    this.#maybeDrop("payout", input.senderBatchId);
+    this.#maybeDrop("payout", input.senderBatchId, result.payout_batch_id);
     return result;
   }
   getPayoutBatch(payoutBatchId: string) {

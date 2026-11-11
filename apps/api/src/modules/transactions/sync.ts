@@ -151,6 +151,71 @@ export async function syncTransactions(
 }
 
 /**
+ * Fetches, one by one, the PayPal payments that orders name but that we do not
+ * hold yet. Transaction Search can be up to three hours behind (and needs its
+ * own permission), so a payment made minutes ago is only reachable this way:
+ * GET /v2/payments/captures/{id} with the ID the store recorded.
+ *
+ * The capture record has no payer details and no refunded total. A payment
+ * PayPal reports as PARTIALLY_REFUNDED is stored with its status so the amount
+ * left is treated as unknown until the next full sync; PayPal itself still
+ * refuses any refund above what is left.
+ */
+export async function lookupPaymentsByReference(
+  deps: { db: Db; clock: Clock },
+  input: { orgId: string; connectionId: string; provider: PayPalProvider; limit?: number },
+): Promise<{ looked: number; found: number; notFound: string[] }> {
+  const { db, clock } = deps;
+  const orders = await db.query<{ payment_reference: string; placed_at: Date }>(
+    `select distinct on (o.payment_reference) o.payment_reference, o.placed_at
+       from orders o
+      where o.org_id = $1 and o.payment_reference is not null and o.payment_method in ('paypal', 'unknown')
+        and not exists (select 1 from payment_transactions p
+                         where p.org_id = o.org_id and p.environment = $2 and p.transaction_id = o.payment_reference)
+      order by o.payment_reference limit $3`,
+    [input.orgId, input.provider.environment, input.limit ?? 500],
+  );
+  const result = { looked: orders.length, found: 0, notFound: [] as string[] };
+  for (const order of orders) {
+    let capture;
+    try {
+      capture = await input.provider.getCapture(order.payment_reference);
+    } catch (err) {
+      const status = (err as { httpStatus?: number | null }).httpStatus;
+      if ((err as { kind?: string }).kind === "rejected" && (status === 404 || status === 422 || status === 400)) {
+        result.notFound.push(order.payment_reference);
+        continue;
+      }
+      throw err;
+    }
+    let gross: number;
+    try {
+      gross = toMinor(capture.amount.value, capture.amount.currency_code);
+    } catch {
+      result.notFound.push(order.payment_reference);
+      continue;
+    }
+    await db.query(
+      `insert into payment_transactions
+         (org_id, paypal_connection_id, environment, transaction_id, kind, provider_status, occurred_at, currency,
+          gross_minor, refunded_minor, invoice_id, custom_id, source, raw, last_synced_at)
+       values ($1,$2,$3,$4,'payment',$5,$6,$7,$8,$9,$10,$11,'api_lookup',$12::jsonb,$13)
+       on conflict (org_id, provider, environment, transaction_id) do update set
+         provider_status = excluded.provider_status, last_synced_at = excluded.last_synced_at`,
+      [
+        input.orgId, input.connectionId, input.provider.environment, capture.id, capture.status,
+        capture.create_time ?? new Date(order.placed_at).toISOString(), capture.amount.currency_code, gross,
+        capture.status === "REFUNDED" ? gross : 0, capture.invoice_id ?? null, capture.custom_id ?? null,
+        json(capture), clock.now().toISOString(),
+      ],
+    );
+    result.found++;
+  }
+  await db.tx((tx) => linkOrdersToPayments(tx, input.orgId));
+  return result;
+}
+
+/**
  * Ties orders to PayPal payments.
  *
  *   exact      the store recorded PayPal's payment ID on the order, or the
