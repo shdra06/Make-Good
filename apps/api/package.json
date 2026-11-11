@@ -18,7 +18,9 @@
     "smoke": "node scripts/smoke.ts",
     "sandbox": "node scripts/sandbox-verify.ts",
     "sandbox:recall": "node scripts/sandbox-recall.ts",
-    "ai:verify": "node scripts/ai-verify.ts"
+    "ai:verify": "node scripts/ai-verify.ts",
+    "test:e2e": "node scripts/demo-capture.ts --fast",
+    "demo:capture": "node scripts/demo-capture.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.7.0",
@@ -32,6 +34,7 @@
   "devDependencies": {
     "@types/node": "^24",
     "@types/pg": "^8.23.1",
+    "playwright-core": "^1.63.0",
     "typescript": "^5"
   }
 }

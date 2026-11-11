@@ -7,3 +7,5 @@ data/uploads/
 
 # crash dumps from command-line tools
 *.stackdump
+# Demo recordings are large; they are rebuilt with npm run demo:capture
+demo/video/

@@ -2,6 +2,10 @@
 
 One story: a supplier recalls one batch of a hand mixer. The demo shows the hard part (who received that batch, from records that do not agree), then the decision, then PayPal's answer.
 
+## A recording already exists
+
+`npm run demo:capture` (in `apps/api`) drives the page in Microsoft Edge and writes `demo/video/make-good-demo.mp4` (about 4 minutes, with captions, real Gemini, PayPal simulator) and 15 screenshots in `demo/screens/`. Run it again after any change to the page. Trim the video to three minutes, or record a voice-over on top of it.
+
 ## Before you start
 
 ```bash

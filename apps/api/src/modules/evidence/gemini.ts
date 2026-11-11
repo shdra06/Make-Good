@@ -23,7 +23,12 @@ export class GeminiEvidenceAi implements EvidenceAi {
     this.#fetch = options.fetchImpl ?? fetch;
   }
 
+  /** One retry when the answer is unusable: the model's output varies from call to call. */
   async #ask<T>(system: string, user: string, schema: z.ZodType<T>, maxTokens: number): Promise<T | null> {
+    return (await this.#once(system, user, schema, maxTokens)) ?? (await this.#once(system, user, schema, maxTokens));
+  }
+
+  async #once<T>(system: string, user: string, schema: z.ZodType<T>, maxTokens: number): Promise<T | null> {
     const res = await this.#fetch(`${API}/models/${encodeURIComponent(this.model)}:generateContent`, {
       method: "POST",
       headers: { "content-type": "application/json", "x-goog-api-key": this.#apiKey },

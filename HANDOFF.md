@@ -40,6 +40,8 @@ Key backend modules (`apps/api/src/modules/`):
 | `npm start` | Server and page at http://localhost:4000. "Open the recall case" loads the demo. |
 | `npm run sandbox:recall` | The recall case on the real PayPal sandbox. About 8 minutes: run it in the background. |
 | `npm run ai:verify` | The three AI steps against the real model in `.env`. About 1 minute. |
+| `npm run test:e2e` | The page in Edge, start to finish, on the simulator. About 1 minute. |
+| `npm run demo:capture` | Same walk-through, slow, with captions: writes the demo video and screenshots. About 5 minutes. |
 
 ## Rules that must hold
 
@@ -71,7 +73,7 @@ Do these in order. Tick each when it is tested, committed and pushed.
 - [x] 1. CSV order upload: `commerce/csv.ts`, `POST /stores/:storeId/orders/csv`, `test/csv.test.ts`. Left: an upload button on the page (API only today)
 - [x] 2. Buyer link: `incidents/confirm.ts`, `/api/public/confirm/:token`, the page at `/?confirm=<token>`, button in the record drawer. The answer is evidence only; staff still decide. Checked in a browser
 - [x] 3. `Dockerfile` and `.github/workflows/ci.yml` written. **Neither has run**: no Docker here; check the first CI run on GitHub
-- [ ] 4. Automated browser test of the page's main flow
+- [x] 4. Browser test in Microsoft Edge: `npm run test:e2e` (about 1 minute, AI off). `npm run demo:capture` records `demo/video/make-good-demo.mp4` (about 4 minutes, captions, real AI; not in git) and `demo/screens/*.png` (in git). Needs Edge and ffmpeg, so it is not in CI
 - [ ] 5. Other merchant screens: dashboard, monitoring, currencies, settings (API exists)
 - [ ] 6. Email notices (file transport first)
 - [ ] 7. Shopify or WooCommerce connector (needs a test store)
@@ -88,4 +90,4 @@ Known loose end: another session's `integration/proposed-0002_…sql` (outside t
 
 ## Last session
 
-11 Nov 2026 (third sitting, Opus): Gemini added as the AI provider and verified on the real API; `npm run ai:verify` added; migration 0003; 118 tests pass. Next: work queue item 4 (browser test).
+11 Nov 2026 (fourth sitting, Opus): browser test and demo capture added; video (3 min 54 s) and 15 screenshots made with real Gemini; one retry added to Gemini calls. Next: work queue item 5, or edit the video for submission.
