@@ -10,16 +10,19 @@ Updated 11 Nov 2026. Everything here was run on this machine (Windows 11, Node 2
 npm test
 ```
 
-Run from `apps/api`. Result of the last run (11 Nov): **83 tests, 83 passed, 0 failed**, in about 75 seconds.
+Run from `apps/api`. Result of the last run (11 Nov, after the product review changes): **113 tests, 113 passed, 0 failed**, in about two minutes.
 
 | File | Tests | What it covers |
 |---|---|---|
 | `test/money.test.ts` | 6 | Exact parsing, PayPal's decimal rules (no decimals for JPY, HUF, TWD), four rounding modes, splits that always add up |
 | `test/schema.test.ts` | 4 | Migrations apply once; the database refuses cross-organisation links, bad amounts, and edits to the audit log |
 | `test/matching.test.ts` | 28 | The matching engine: packing records, inventory, mixed stock, variants, quantities, returns, replacements, guests, serials, duplicates, overcharges, service outages |
+| `test/two-questions.test.ts` | 16 | Payment identity and eligibility answered separately: the four combinations, shared and duplicate order numbers, split payments, a person's reconciliation, fact / inference / assumption marking, cleared buyers, product-code aliases, and that PayPal data alone never proves a batch |
 | `test/compensation.test.ts` | 17 | Seven rule types, tax and discount and shipping, limits, earlier refunds, currencies, the 180-day rule, 200 random orders that must add back up |
 | `test/execution.test.ts` | 17 | The money path end to end with injected faults: lost replies, 5xx, a stopped worker, duplicate jobs, rate limits, low balance, disputes, pending refunds, approvals, cancellation, payouts, and fetching a payment by its ID |
-| `test/api.test.ts` | 11 | Sign-in, rate limit, tenant isolation on all 48 organisation routes, roles, cross-site requests, a recall through the API, monitoring, currency exposure, secret handling, webhooks, the API description |
+| `test/manifest.test.ts` | 11 | What an approval covers: the manifest cannot be edited; a new customer, a rule change or a changed balance withdraws the approval; the worker withholds a payment its approval no longer covers; only listed operations are released; a refused refund is never turned into a payout; no double payment across incidents; one refund per payment per batch; reconciling a payment; a person's confirmation as evidence |
+| `test/recall.test.ts` | 3 | The HM-300 recall case end to end through the API on the simulator, with every count checked against the known answers; the check that drops unquoted or invented fields; and a stand-in model whose invented output is dropped and changes nothing |
+| `test/api.test.ts` | 11 | Sign-in, rate limit, tenant isolation on every organisation route, roles, cross-site requests, a recall through the API, monitoring, currency exposure, secret handling, webhooks, the API description |
 
 The database in these tests is PGlite: PostgreSQL itself, compiled to run in-process, in memory. The SQL and the migrations are the same ones production would use.
 
@@ -114,6 +117,58 @@ After the check, the script refunded the rest of each payment so that the remain
 
 What this run does not show: the orders were created through the import format, not pulled from a real store; the payments were card payments, not PayPal-wallet payments; and nothing here used Transaction Search.
 
+## 2a. The HM-300 recall case on the PayPal sandbox (11 Nov 2026)
+
+```bash
+npm run sandbox:recall
+```
+
+One run, 07:40 to 07:47 UTC, all 47 checks passed. The payments, refunds, lookups, dispute checks and refusals are PayPal's own answers. The merchant records (orders, packing records, the supplier notice) are synthetic and are stored with that label. No simulator is involved. The full output is in `apps/api/.data/sandbox-recall.json` on the machine that ran it.
+
+| Step | Result at PayPal |
+|---|---|
+| Take test payments by card | 26 payments for 28 synthetic orders, plus 1 for a late order |
+| Refunds that are part of the back story, made directly at PayPal | A 20.00 goodwill refund, a return refunded in full, a customer-service refund in full |
+| Two payments with one invoice number | **PayPal refused the second: `DUPLICATE_INVOICE_ID`.** It was taken without an invoice number, so both orders pointed at the one payment that carried the number. Both were held as ambiguous. |
+| Read each payment by ID | 26 of 26 found. Transaction Search was not used (this app does not have it). |
+| The payment ID the store recorded wrongly | PayPal does not know it. The order is held: payment not found. |
+| Read the supplier notice | By pattern rules (no Claude key). Products HM-300 and HM-300-EU, batch B-2217. A person saved the rules. |
+| Dispute check before matching | 19 payments asked about, 0 in dispute |
+| Match | 12 ready after two product-code aliases were confirmed by a person; 5 held for evidence of the unit; 3 held for the payment; 4 shown not to be affected |
+| Against the known answers | 18 of 21 affected units proven from records; 0 wrongly called proven; 5 held (3 truly affected, 2 not); 0 missed. 21 payments verified and right, 0 tied to the wrong order. 12 of 12 calculated amounts exact. |
+| People's decisions | Two orders confirmed with a stated reason. A confirmation was refused for the ambiguous payments; each was then settled by naming the payment. |
+| Payment list, version 1 | 16 refunds, 977.10 USD. The person who built it could not approve it. A second person approved. |
+| A late affected order arrives | **The approval was withdrawn.** The list could not be started. Version 2 (17 refunds) was built and approved afresh. Version 1 is kept, marked invalidated. |
+| One listed payment refunded directly at PayPal after approval | Our refund was refused: `CAPTURE_FULLY_REFUNDED`. It stays failed. No payout was created. |
+| One reply thrown away after PayPal had acted | The operation was held as `unknown`, not failed. Asking again with the same request ID returned the same refund (`6VC86280HM550293P`): 2 calls, one refund. |
+| Result | Batch `completed_with_failures`: 16 refunded, 1 failed |
+| Asked PayPal for each refund | 16 of 16 are `COMPLETED` for the amount on the approved list |
+| Full and partial refunds | 14 payments now `REFUNDED`, 2 `PARTIALLY_REFUNDED` (the multi-item order and the one-of-two-units order) |
+| Money against the known answers | 15 labelled lines paid, 918.10 USD: none over, none under, none to an unaffected customer, none twice |
+| Audit trail | 61 entries, chain intact |
+
+PayPal IDs from this run, which can be looked up in the sandbox dashboard:
+
+| Case | Payment (capture) | Our refund | Amount | Payment status after |
+|---|---|---|---|---|
+| Multi-item order: only the mixer's share | `76P113675M1184632` | `9XW34277GH0989512` | 53.10 | `PARTIALLY_REFUNDED` |
+| Two units, one from the recalled batch (also the lost reply) | `0UV99253465369136` | `6VC86280HM550293P` | 59.00 | `PARTIALLY_REFUNDED` |
+| 20.00 already given back before the incident | `7TG2677804011084S` | `50C05286ES305710C` | 39.00 | `REFUNDED` |
+| Two units, both recalled | `6LT57801WH289873J` | `34W085724U2731835` | 118.00 | `REFUNDED` |
+| Shared order number, settled by a person | `58114568959304816` | `66W56458EJ130432F` | 59.00 | `REFUNDED` |
+| Shared order number, the other order | `78B99767S4642401D` | `2T090125KF7632732` | 59.00 | `REFUNDED` |
+| Refunded outside Make Good after approval | `0HD155792C7638004` | none: refused | | `REFUNDED` by the outside refund `9MN73375CH4664813` |
+
+Payment lists from this run: version 1, sha-256 `b917e0e6c804cfb1…ad1cb56` (16 items, invalidated); version 2, sha-256 `74e624ac5b341466…79d936d4` (17 items, in force).
+
+Three cases could not be staged on the sandbox and ran on the simulator only: an open dispute (the sandbox cannot open one on request), a payment tied to an order only by email, amount and time (needs the payer's email, which only Transaction Search returns), and a payment with no order at all.
+
+## 2b. The page, in a browser (11 Nov 2026)
+
+The server was started with `npm start` and the page at http://localhost:4000 was driven by hand through the whole recall case on the simulator: load the case, read the notice, save the rules, match, confirm two product-code aliases and reject one, open a held record, confirm it with a reason, settle an ambiguous payment, price the options, build the payment list, approve it, stage a lost reply, start paying, and watch the lost reply sit at "Outcome unknown" and then settle with one refund after two calls. The figures on screen matched the API. There are no automated browser tests.
+
+Two faults were found this way and fixed: the sample loader missed refunds made a moment after its sync window, and the table of two answers counted excluded records.
+
 ## 3. Other outside systems
 
 | System | Reached? | Detail |
@@ -121,7 +176,7 @@ What this run does not show: the orders were created through the import format, 
 | PayPal sandbox | **Yes** | See section 2 |
 | PayPal live | No, and refused by default | |
 | Exchange rates (Frankfurter, European Central Bank) | **Yes** | `GET https://api.frankfurter.dev/v1/latest` and the date-range form both returned data; USD/EUR 0.89174 for 10 Nov 2026 |
-| Claude | No | No key, and no AI feature is built yet |
+| Claude | **No** | No key on this machine. The Claude calls are written and tested with a stand-in model only. |
 | A store (WooCommerce, Shopify) | No | No connector built, no store available |
 | Email | No | Not built |
 
@@ -129,7 +184,7 @@ What this run does not show: the orders were created through the import format, 
 
 | Scenario | State |
 |---|---|
-| A. Manufacturing recall | Works end to end on the simulator (81 sample orders) **and on the PayPal sandbox** (3 real payments, real refunds). No screens yet. |
+| A. Manufacturing recall | The flagship. Works end to end on the simulator, in the page and in tests, **and on the PayPal sandbox** (27 real payments, 16 real refunds, a lost reply, a refusal and a withdrawn approval). |
 | B. Missing customer (claim) | **Not built.** |
 | C. Billing error | Works end to end **on the simulator**: detection, incident, match, refunds. On a real account, detection needs Transaction Search, which this app does not have yet. |
 | D. Cross-border | Reporting works with live reference rates. Refunds in EUR, GBP and JPY run on the simulator. A real cross-border refund or payout has not been made. |

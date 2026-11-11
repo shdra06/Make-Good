@@ -26,6 +26,10 @@ Written 10 Nov 2026.
 | Payout of 1.00 USD to an address with no PayPal account | Batch `SUCCESS`, item `UNCLAIMED` with `RECEIVER_UNREGISTERED`. |
 | The same payout sent again | Refused with HTTP 400, "Batch with given sender_batch_id already exists", and the refusal names the original payout. |
 | Cancel that unclaimed payout | PayPal's sandbox answered `500 INTERNAL_SERVICE_ERROR` on every try. One 1.00 USD sandbox payout is left unclaimed; PayPal returns those after 30 days. |
+| A second payment with an invoice number already used (`npm run sandbox:recall`) | Refused: `DUPLICATE_INVOICE_ID`. On this account, two payments cannot share an invoice number, so that kind of ambiguity has to come from the store's side: two orders with one number. |
+| Refund a payment that was refunded in full outside our system after approval | `422 CAPTURE_FULLY_REFUNDED`. The operation stays failed. |
+| Many refunds through the worker: full, partial, and the remainder after an earlier partial refund | 16 of 16 `COMPLETED` for the listed amount. Payments show `REFUNDED` or `PARTIALLY_REFUNDED` as expected. |
+| Disputes list, asked for 19 payments before matching | Answers each time with an empty list |
 
 Not tried on the sandbox: a refund that stays pending, a balance too low to refund, a payment in dispute, a payment older than 180 days, a webhook, and a payout that is actually received.
 

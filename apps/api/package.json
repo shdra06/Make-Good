@@ -16,7 +16,8 @@
     "test": "node --test \"test/**/*.test.ts\"",
     "typecheck": "tsc --noEmit",
     "smoke": "node scripts/smoke.ts",
-    "sandbox": "node scripts/sandbox-verify.ts"
+    "sandbox": "node scripts/sandbox-verify.ts",
+    "sandbox:recall": "node scripts/sandbox-recall.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.7.0",

@@ -1,22 +1,55 @@
 # Make Good
 
-Pay back many customers at once, correctly, through PayPal.
+Make Good helps a merchant work out exactly who is owed money, why they are owed it, how much they should receive, and what was actually paid.
 
-> **Two things live in this folder.**
->
-> 1. **The first prototype** (`src/`, `public/`): one process, a local file database, a mock PayPal. This README describes it. It still runs as before.
-> 2. **The platform rebuild** (`apps/api/`): a multi-tenant backend with a durable payment worker, built to the standard of real payment software. Its automated tests pass, and on 11 Nov 2026 it made real refunds on PayPal's sandbox, including recovery from a lost reply. It has no web screens yet.
->
-> For the rebuild, read [docs/CHECKLIST.md](docs/CHECKLIST.md) (what is built and verified), [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/PAYPAL.md](docs/PAYPAL.md) and [docs/VERIFICATION.md](docs/VERIFICATION.md). To run it:
->
-> ```bash
-> cd apps/api
-> npm install
-> npm test
-> npm start
-> ```
->
-> Then, in a second terminal, `npm run smoke` walks a recall, a billing error and a currency report against the running server, using the built-in PayPal simulator. `npm run sandbox` runs a recall with real refunds on PayPal's sandbox, using the keys in `.env`.
+When a supplier recalls one batch of a product, refunding is the easy part. PayPal knows who paid; it does not know which batch anyone received. The hard part is joining the supplier's notice, the shop's orders and packing records, and PayPal's payments, when those records do not agree. Make Good does that part in the open: every customer record carries the evidence behind it, uncertain cases are held for a person, one exact payment list is approved, and only what PayPal confirms is shown as paid.
+
+## The platform (`apps/api`, `apps/web`)
+
+```bash
+cd apps/api
+```
+
+```bash
+npm install
+```
+
+```bash
+npm start
+```
+
+Open http://localhost:4000 and press **Open the recall case**. It loads 32 invented orders on a built-in PayPal simulator and walks seven questions in order: what went wrong, who might be affected, what the evidence says, what the options are and what each costs, what was approved, and what actually happened. [docs/DEMO.md](docs/DEMO.md) is a three-minute script for it.
+
+| Command (in `apps/api`) | What it does |
+|---|---|
+| `npm test` | 113 automated tests, on a real PostgreSQL engine running in-process. No PayPal calls. |
+| `npm run sandbox:recall` | Runs the same recall case on **PayPal's real sandbox**: real test payments, real refunds, one lost reply, one refusal, one withdrawn approval. Needs sandbox keys in `.env`. |
+| `npm run sandbox` | The earlier sandbox check of the payment path alone. |
+| `npm run smoke` | Drives a running server through a recall, a billing error and a currency report on the simulator. |
+
+What to read:
+
+| File | What it answers |
+|---|---|
+| [docs/CHECKLIST.md](docs/CHECKLIST.md) | What is built, what is verified and how, what is blocked |
+| [docs/STRATEGY.md](docs/STRATEGY.md) | Who this is for, what we verified about the market and what we only assume |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | How it is built and why; the two-question matching; approval manifests |
+| [docs/VERIFICATION.md](docs/VERIFICATION.md) | Exactly what was run, with PayPal's own IDs |
+| [docs/PAYPAL.md](docs/PAYPAL.md) | PayPal facts checked against PayPal's own API files and the sandbox |
+
+Three rules hold everywhere:
+
+1. AI reads and proposes. It never decides who is affected, never approves and never moves money.
+2. Nothing is sent until a person approves one exact, unchangeable payment list. If anything under that list changes, the approval is withdrawn.
+3. Nothing is shown as paid until PayPal's own record says so. A lost reply is "unknown", never "failed" and never sent twice.
+
+What is not there yet: a Claude key has not been available, so the Claude calls are tested only with a stand-in model; no merchant has been interviewed; store connectors, the customer claims portal and email notices are not built. Live PayPal has never been used and is refused by default.
+
+---
+
+## The first prototype (`src/`, `public/`)
+
+The rest of this file describes the first prototype: one process, a local file database, a mock PayPal. It still runs as before, on port 3000, and is kept for reference. The platform above replaces it.
 
 When a shop has to refund a lot of people (a faulty batch, a cancelled event, an overcharge, a double charge), Make Good finds who is owed money, says how sure it is about each customer, and sends the refunds after one approval.
 

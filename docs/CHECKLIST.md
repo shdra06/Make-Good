@@ -1,6 +1,6 @@
 # Make Good: implementation checklist
 
-Last updated 11 Nov 2026. A line is marked **Verified** only after it ran and passed. The evidence column says what was run.
+Last updated 11 Nov 2026, after the product review changes. A line is marked **Verified** only after it ran and passed. The evidence column says what was run.
 
 | Mark | Meaning |
 |---|---|
@@ -23,7 +23,44 @@ npm run smoke
 npm run sandbox
 ```
 
-`npm test` runs the automated tests against a real PostgreSQL engine running in-process (PGlite). `npm run smoke` drives a running server over HTTP. Neither touches PayPal: they use the built-in simulator. `npm run sandbox` is the one that talks to PayPal's real sandbox, using the keys in `make-good/.env`.
+```bash
+npm run sandbox:recall
+```
+
+`npm test` runs the automated tests against a real PostgreSQL engine running in-process (PGlite). `npm run smoke` drives a running server over HTTP. Neither touches PayPal: they use the built-in simulator. `npm run sandbox` and `npm run sandbox:recall` are the ones that talk to PayPal's real sandbox, using the keys in `make-good/.env`. The second runs the whole HM-300 recall case there.
+
+## Stage 0. The product review, mapped to what was done
+
+An independent product review (10 Nov 2026) and the brief that followed it asked for the changes below. "Review" names the finding in that document.
+
+| Recommendation | State | Evidence |
+|---|---|---|
+| **Review P0: one customer, one incident.** Lead with a growing ecommerce merchant and a defective batch | Done | The page, the sample case and the demo script are one recall story. Other incident types still work and sit behind it. `docs/STRATEGY.md` |
+| **Review P0: unvalidated market.** Do not claim demand | Done as far as honesty goes. **No merchant has been interviewed.** | `docs/STRATEGY.md` separates sourced findings from assumptions and lists the five interview questions |
+| **Review P0: misleading confidence.** Separate payment-to-order match from incident eligibility; categories, not probabilities | Verified | `payment_identity` and `eligibility` are stored separately; `decision` is a fixed table. `test/two-questions.test.ts` (16 tests) |
+| **Review P0: fragile source data.** Never infer a batch from payment data; show exact, likely and unknown evidence | Verified | Every piece of evidence is marked fact, inference or assumption. The engine refuses "proven" without a packing record or a named person. `test/two-questions.test.ts` "PayPal data alone never proves a batch" |
+| Ambiguous payments are held, not paid | Verified | Two payments with one order number, one payment tied to two orders, and guessed links are all `ambiguous`. A confirmation cannot settle them; a named person's reconciliation can. `test/manifest.test.ts`, `test/recall.test.ts` |
+| **Review: Recovery Map as the signature screen.** Who is included, excluded or held, and why; evidence; restricted payments; liability | Verified on the simulator, in a browser | `GET /recovery-map`, the page's questions 2 and 3. `test/recall.test.ts` |
+| Compare compensation policies and what each costs | Verified | `POST /policies/compare`: a dry calculation that saves and pays nothing. Three default policies, any compensation rule. `test/recall.test.ts` |
+| Export the exact approved payment list | Verified | `GET /batches/:id/manifest` (JSON) and `?format=csv`. The CSV carries the list's hash |
+| **Review: approval must cover exactly what is paid.** Versioned, immutable; invalidated by a changed rule, a newly matched customer or a refreshed balance | Verified | `approval_manifests` with a database trigger; approvals bound to the hash; withdrawal on change; the worker re-checks before each call. `test/manifest.test.ts` (11 tests) |
+| Refund-intent ledger: stable ID, capture, order line, reason, approval and rule version, amount, PayPal refund ID and status | Verified | Columns on `payment_operations`; `GET /ledger`, `GET /ledger/captures/:id` |
+| No duplicate payment across incidents | Verified | A purchase paid under another incident is held for a named person; a payment being refunded by another batch waits. `test/manifest.test.ts` |
+| A failed refund is never silently turned into a payout; payouts need their own approval | Verified | Payouts go in a batch of their own. `test/manifest.test.ts` "a refund PayPal refuses stays failed" |
+| A timeout is never a failure | Verified earlier, unchanged | `test/execution.test.ts`; on the sandbox, see Stage 2 |
+| **Review: make AI prove its usefulness.** Evidence tasks, each conclusion citing its source, structured outputs, checked by code, confirmed by a person | Built. **Not verified against Claude: no API key on this machine.** | Reading a notice, an opinion on product-code aliases, explaining a held record. Each has a structured output and a check that drops anything not grounded in the source. Tested with a stand-in model in `test/recall.test.ts`. The pattern-rule reader (no AI) is verified |
+| AI never decides eligibility, approves or moves money | Verified | Claude is called from one file and has no tool. Tests show its output changes no record |
+| **Review: 10 to 15 deliberately messy cases with known answers** | Verified | 32 synthetic orders, 29 with a stored right answer. `src/modules/demo/recall-scenario.ts` |
+| At least one uncertain case held, not paid | Verified | Five are held on the simulator; one of them is in truth not affected |
+| Real sandbox refunds, full and partial, with read-back | **Verified on the sandbox** | 16 refunds, each `COMPLETED` at PayPal for the listed amount; 14 payments fully refunded, 2 partially. `docs/VERIFICATION.md` section 2a |
+| A controlled failure and a safe recovery, no duplicate | **Verified on the sandbox** | A reply discarded after PayPal acted: held as unknown, then the same refund returned on asking again. A payment refunded elsewhere: PayPal refused ours, it stayed failed, no payout was made |
+| An approval withdrawn by a late order, then a new version approved | **Verified on the sandbox** | Version 1 invalidated and kept; version 2 approved by a second person and paid |
+| **Review: metrics measured, not asserted** | Verified | `GET /evaluation`: who is affected (precision, recall, held, missed), which payment, amounts, what was paid, duplicates, completion, work left for people, clock times. Each figure is a count from the run |
+| Label synthetic records, sandbox payments and real PayPal answers | Verified | Every screen states the PayPal environment and whether merchant records are synthetic. The manifest records the environment |
+| **Review: seven questions in order; a three-minute demo** | Verified in a browser on the simulator | `apps/web/public`, `docs/DEMO.md` |
+| **Review P1: one real notification channel, or label it simulated** | Not built | No notices are sent or previewed. The buyer confirmation link is not built: staff record a customer's answer by hand |
+| **Review: cut payouts, claims, image analysis and duplicate-charge scanning from the critical path** | Done | They remain in the code and the API. None is on the page or in the demo |
+| Merchant interviews (five questions) | **Blocked on you** | Needs three to five people who run a shop |
 
 ## Stage 1. Architecture and foundation
 
@@ -57,6 +94,8 @@ npm run sandbox
 | PayPal's refusals: too much, already refunded, wrong currency, too many decimals, unknown ID | **Verified on the sandbox** | Real error names recorded in `docs/PAYPAL.md` |
 | Disputes list | **Verified on the sandbox** | The call answers. No dispute existed, so reading one is untested. |
 | Payouts: create, read back, and a repeat is refused with a pointer to the original | **Verified on the sandbox** (direct calls) | Payout `UNCLAIMED` as expected for an address with no account. The worker's payout path has run on the simulator only. |
+| The whole recall case: 27 real payments, matching, people's decisions, payment list versions, 16 refunds, a lost reply, a refusal | **Verified on the sandbox** | `npm run sandbox:recall`, 47 checks, all passed. The merchant records in that run are synthetic. |
+| PayPal asked about disputes on each payment before matching | **Verified on the sandbox** | 19 payments asked about; none was in dispute, so an open dispute is still simulator-only |
 | Transaction Search sync | **Blocked** | PayPal answered `403 NOT_AUTHORIZED`: this app does not have the Transaction Search permission. Works on the simulator. |
 | Refund totals recomputed from PayPal's refund rows | Verified on the simulator | Depends on Transaction Search |
 | Pending refunds, low balance, a dispute on the payment | Verified on the simulator only | Hard to cause on demand in the sandbox |
@@ -83,7 +122,11 @@ npm run sandbox
 | Item | State | Evidence |
 |---|---|---|
 | Incidents with versioned, never-edited rules | Verified | `test/api.test.ts` |
-| Matching engine: five evidence levels, evidence and missing-information lists, recommended action | Verified | `test/matching.test.ts` (28 tests) |
+| Matching engine: two separate answers (payment identity, eligibility), a fixed decision table, evidence marked fact, inference or assumption, missing-information lists | Verified | `test/matching.test.ts` (28 tests), `test/two-questions.test.ts` (16 tests) |
+| Buyers shown not to be affected are stored with the record that cleared them | Verified | `test/two-questions.test.ts` |
+| Product codes written differently: found by rule, matched only after a person confirms the alias | Verified | `test/two-questions.test.ts`, `test/recall.test.ts` |
+| PayPal is asked about disputes on each payment before anyone is called payable | Verified on the simulator and the sandbox | `test/recall.test.ts`, `npm run sandbox:recall` |
+| A person's decision is stored as evidence in their name and survives a new match | Verified | `test/manifest.test.ts` |
 | Batch by packing record, by inventory dates, mixed stock, ship window only, no data | Verified | `test/matching.test.ts` |
 | Variants, multi-quantity lines, partial and full returns, replacements, guest checkout, non-PayPal orders | Verified | `test/matching.test.ts` |
 | Serial numbers | Verified | `test/matching.test.ts` |
@@ -103,6 +146,9 @@ npm run sandbox
 | Step-by-step working stored with every amount | Verified | `test/api.test.ts` |
 | Dry run (preview) that writes nothing and calls nothing | Verified | `test/execution.test.ts` |
 | Approval: roles, second person, approval bound to the exact contents | Verified | `test/execution.test.ts` "approval rules" |
+| Versioned, immutable approval manifest; withdrawn when a rule, a customer, an amount or a refundable balance changes; revised into a new version | Verified | `test/manifest.test.ts` (11 tests) |
+| The worker checks each payment against the approved manifest and the records immediately before calling PayPal, and withholds it otherwise | Verified on the simulator | `test/manifest.test.ts` |
+| Payouts in a batch and approval of their own; one refund per PayPal payment per batch; a purchase paid under another incident is held | Verified | `test/manifest.test.ts`, `test/execution.test.ts` |
 | Durable job queue in PostgreSQL, at-least-once, with leases | Verified | `test/execution.test.ts` |
 | Lost reply after PayPal acted: resolved, one refund | Verified on the simulator **and on the sandbox** | `test/execution.test.ts`, `npm run sandbox` |
 | Request never arrived: retried, one refund | Verified on the simulator | `test/execution.test.ts` |
@@ -114,13 +160,16 @@ npm run sandbox
 | Payouts for payments older than 180 days | Verified on the simulator | `test/execution.test.ts` |
 | One live refund per payment, one payment per customer: enforced by database indexes | Verified | `test/execution.test.ts` |
 
-## Stage 6. Claims and AI
+## Stage 6. Evidence, claims and AI
 
 | Item | State | Evidence |
 |---|---|---|
 | Tables for claims, evidence and claim events | Verified | Part of the schema |
 | Customer claim portal, evidence upload, review, appeal | **Not built** | |
-| AI reading of receipts and labels | **Not built** | Will need a Claude key to verify |
+| Supplier notice stored with the incident and read into fields; each field must quote the notice and contain its value, or it is dropped | Verified with the pattern-rule reader | `test/recall.test.ts` |
+| Rules are saved only by a person, and cannot contain a code the notice never mentions | Verified | `test/recall.test.ts` |
+| Claude: reading a notice, an opinion on product-code aliases, explaining a held record. Structured outputs, checked by code, no tools | **Built, not verified against Claude** | No API key on this machine. Tested with a stand-in model that returns invented and unsupported output, all of which is dropped: `test/recall.test.ts` |
+| AI reading of receipts and labels sent by customers | **Not built** | Belongs with the claims portal |
 | Email notices | **Not built** | Table exists; no transport code |
 
 ## Stage 7. Monitoring and financial intelligence
@@ -137,10 +186,11 @@ npm run sandbox
 
 | Item | State |
 |---|---|
-| Merchant web app (11 screens) | **Not built** |
+| The recall story as one page: seven questions in order, the Recovery Map, the record drawer, policy pricing, the payment list with export, live payment status, audit trail, measured results | **Verified by hand in a browser on the simulator** (11 Nov 2026): the full flow, including a person's confirmation, a payment reconciliation and a lost reply resolved with one refund |
+| The other merchant screens (dashboard, monitoring, currencies, settings, staff) | **Not built.** The API for them exists and is tested |
 | Customer claim pages | **Not built** |
 
-The API the screens need exists and is tested. The old prototype's console in `make-good/public` still runs against the old prototype only.
+The page is `apps/web/public` (plain HTML, CSS and JavaScript, no build step), served by the API at http://localhost:4000. It has no automated browser tests. The old prototype's console in `make-good/public` still runs against the old prototype only.
 
 ## Stage 9. Hardening
 
@@ -165,7 +215,8 @@ The API the screens need exists and is tested. The old prototype's console in `m
 
 1. **Transaction Search permission.** In the PayPal developer dashboard, open the app and tick Transaction Search under its features. PayPal currently answers `403 NOT_AUTHORIZED`. Without it, payments are fetched one by one from the IDs that orders carry, which works, but duplicate-charge detection and history have nothing to read on a real account.
 2. **A store to connect.** A WooCommerce test site or a Shopify development store, for a real connector.
-3. **A Claude key**, when claims are built.
+3. **A Claude key.** Put `ANTHROPIC_API_KEY` in `apps/api/.env`. Until then every AI step says it is not configured, the notice is read by pattern rules, and the Claude calls stay unverified.
+3a. **Three to five people who run a shop**, for the five interview questions in `docs/STRATEGY.md`. Nothing in this repository shows that a merchant wants this.
 4. **A public address and a registered webhook**, to check webhook signatures against PayPal.
 5. **PayPal partner approval.** Only matters for a hosted product serving other merchants. Not needed for the hackathon.
 
