@@ -43,6 +43,7 @@ Key backend modules (`apps/api/src/modules/`):
 | `npm run sandbox:recall` | The recall case on the real PayPal sandbox. About 8 minutes: run it in the background. |
 | `npm run ai:verify` | The three AI steps against the real model in `.env`. About 1 minute. |
 | `npm run test:e2e` | The page in Edge, start to finish, on the simulator. About 1 minute. |
+| `npm run demo:video` | The submission video with voice-over (`demo/VIDEO-PLAN.md`). Make the voice first. About 5 minutes. |
 | `npm run demo:capture` | Same walk-through, slow, with captions: writes the demo video and screenshots. About 5 minutes. |
 
 ## Rules that must hold
@@ -92,4 +93,4 @@ Known loose end: another session's `integration/proposed-0002_…sql` (outside t
 
 ## Last session
 
-11 Nov 2026 (seventh sitting, Opus): `render.yaml` added; config uses Render's address and accepts its generated key. Checked by a fresh production-only install run in production mode (PGlite, not Render's Postgres): recall case, match, approval and 10 simulator payments all worked. Not yet deployed. No Claude credit lines in commits (owner's rule).
+11 Nov 2026 (eighth sitting, Opus): submission video made (`demo/video/make-good-submission.mp4`, 3 min 47 s, voice-over, animations of the problem and the solution, the app walkthrough with cursor and captions, built-with and credibility slides). Plan and remake steps in `demo/VIDEO-PLAN.md`. AI was off in the recording (Gemini key at its limit). Fixed the squashed customer-email list. Next: when Gemini works, remake with `npm run demo:video -- --ai`.

@@ -20,7 +20,8 @@
     "sandbox:recall": "node scripts/sandbox-recall.ts",
     "ai:verify": "node scripts/ai-verify.ts",
     "test:e2e": "node scripts/demo-capture.ts --fast",
-    "demo:capture": "node scripts/demo-capture.ts"
+    "demo:capture": "node scripts/demo-capture.ts",
+    "demo:video": "node scripts/demo-video.ts"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.16",

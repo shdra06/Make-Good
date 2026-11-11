@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Make Good video scenes</title>
+<style>
+  :root {
+    --navy: #00205b; --navy-2: #0b2f73; --blue: #0070e0; --blue-2: #3d8bff; --ink: #0d1b2e;
+    --ok: #1fa35a; --hold: #f2a33a; --stop: #e5484d; --mute: #8a97ad;
+    --display: "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; width: 1920px; height: 1080px; overflow: hidden; }
+  body { font-family: var(--display); color: #fff; background: radial-gradient(1400px 800px at 80% -10%, #12408f 0%, transparent 60%), radial-gradient(1000px 700px at -10% 110%, #0a3a7a 0%, transparent 55%), var(--navy); }
+  .scene { position: absolute; inset: 0; padding: 90px 110px; }
+  .eyebrow { font: 600 22px/1 var(--display); letter-spacing: .14em; text-transform: uppercase; color: #8fb8ff; }
+  .head { font: 700 68px/1.08 var(--display); letter-spacing: -0.02em; margin-top: 18px; max-width: 1150px; min-height: 150px; }
+  .fade { opacity: 0; transform: translateY(18px); transition: opacity .7s ease, transform .7s ease; }
+  .fade.in { opacity: 1; transform: none; }
+  .swap { transition: opacity .35s ease; }
+  .logo { display: inline-grid; place-items: center; border-radius: 28px; background: linear-gradient(135deg, var(--blue-2), #002a80); font-weight: 800; color: #fff; box-shadow: 0 20px 60px rgba(0, 0, 0, .35); }
+
+  /* title and close */
+  .center { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; height: 100%; gap: 26px; }
+  .center .logo { width: 150px; height: 150px; font-size: 56px; }
+  .center h1 { font: 800 110px/1 var(--display); margin: 0; letter-spacing: -0.03em; }
+  .center p { font-size: 38px; color: #c8d8f5; margin: 0; max-width: 1300px; line-height: 1.3; }
+  .chips { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; }
+  .chip { font-size: 24px; padding: 10px 20px; border-radius: 999px; background: rgba(255, 255, 255, .1); color: #dfe9fb; }
+
+  /* order cards */
+  .stage { position: absolute; left: 110px; top: 300px; width: 1080px; height: 640px; }
+  .card { position: absolute; width: 120px; height: 104px; border-radius: 14px; background: #fff; color: var(--ink); padding: 12px 12px; font-size: 17px; font-weight: 600;
+          transition: transform .9s cubic-bezier(.2, .8, .2, 1), opacity .5s, background .4s, box-shadow .4s, outline-color .4s; opacity: 0; box-shadow: 0 10px 28px rgba(0, 0, 0, .25); outline: 4px solid transparent; }
+  .card .n { color: #6b7a90; font-size: 15px; font-weight: 600; }
+  .card .p { margin-top: 4px; font-size: 16px; }
+  .card .badge { position: absolute; right: 10px; bottom: 10px; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-size: 18px; font-weight: 800; background: #e8eef8; color: #5b6b84; transition: background .3s, color .3s; }
+  .card .tag { position: absolute; left: -6px; top: -16px; font-size: 14px; font-weight: 700; padding: 3px 9px; border-radius: 8px; background: var(--hold); color: #2b1600; white-space: nowrap; opacity: 0; transition: opacity .4s; }
+  .card.tagged .tag { opacity: 1; }
+  .card.tagged { outline-color: var(--hold); }
+  .card.dispute { background: #ffe4e5; outline-color: var(--stop); }
+  .card.dispute .badge { background: var(--stop); color: #fff; }
+  .card .dots { position: absolute; left: 12px; bottom: 14px; display: flex; gap: 6px; }
+  .card .dot { width: 14px; height: 14px; border-radius: 50%; background: #d7deea; transition: background .3s; }
+  .card .dot.ok { background: var(--ok); } .card .dot.hold { background: var(--hold); } .card .dot.no { background: #b7c1d1; }
+  .card.ready { background: #e7f7ee; } .card.held { background: #fff3df; } .card.out { background: #e9edf3; color: #8a97ad; }
+  .card.paid { background: var(--ok); color: #fff; }
+  .card.paid .n { color: #d8f5e4; }
+  .card.paid .badge { background: #fff; color: var(--ok); }
+
+  .side { position: absolute; right: 110px; top: 330px; width: 560px; display: flex; flex-direction: column; gap: 22px; }
+  .panel { background: rgba(255, 255, 255, .08); border: 1px solid rgba(255, 255, 255, .14); border-radius: 22px; padding: 26px 30px; }
+  .panel h3 { margin: 0 0 8px; font-size: 30px; }
+  .panel p { margin: 0; font-size: 24px; color: #c8d8f5; line-height: 1.35; }
+  .notice { background: #fffdf6; color: #2a2a2a; border-radius: 18px; padding: 26px 30px; font-family: Georgia, serif; font-size: 25px; line-height: 1.45; box-shadow: 0 20px 50px rgba(0, 0, 0, .35); }
+  .notice b { color: #b0223b; }
+  .pill { display: flex; align-items: center; gap: 14px; font-size: 28px; padding: 18px 24px; border-radius: 18px; }
+  .pill.yes { background: rgba(31, 163, 90, .2); }
+  .pill.no { background: rgba(229, 72, 77, .2); }
+  .pill i { font-style: normal; width: 42px; height: 42px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; }
+  .pill.yes i { background: var(--ok); } .pill.no i { background: var(--stop); }
+  .counter { font: 800 76px/1 var(--display); font-variant-numeric: tabular-nums; }
+  .counter.red { color: #ff8a8e; } .counter.green { color: #6ee7a0; }
+  .big-end { position: absolute; left: 110px; bottom: 48px; font: 800 64px/1 var(--display); }
+  .big-end span { box-shadow: inset 0 -16px 0 rgba(229, 72, 77, .55); }
+  .big-end.good span { box-shadow: inset 0 -16px 0 rgba(31, 163, 90, .55); }
+
+  .questions { display: flex; gap: 22px; margin-top: 30px; }
+  .q { display: flex; align-items: center; gap: 16px; font-size: 32px; font-weight: 600; padding: 18px 26px; border-radius: 18px; background: rgba(255, 255, 255, .1); }
+  .q i { font-style: normal; width: 50px; height: 50px; border-radius: 14px; display: grid; place-items: center; background: var(--blue); font-weight: 800; }
+  .colhead { position: absolute; top: -56px; font-size: 26px; font-weight: 700; opacity: 0; transition: opacity .6s; }
+  .colhead.in { opacity: 1; }
+  .colhead small { display: block; font-size: 18px; font-weight: 500; color: #a9bddf; }
+  .lockbar { position: absolute; left: 0; top: 390px; width: 520px; padding: 12px 16px; border-radius: 14px; background: rgba(255, 255, 255, .12); font-size: 21px; opacity: 0; transition: opacity .6s; }
+  .lockbar.in { opacity: 1; }
+  .mono { font-family: Consolas, monospace; color: #9fc2ff; }
+
+  /* stack and trust */
+  .tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 22px; margin-top: 50px; }
+  .tile { background: rgba(255, 255, 255, .08); border: 1px solid rgba(255, 255, 255, .14); border-radius: 22px; padding: 26px 26px 24px; min-height: 250px; }
+  .tile .k { display: inline-block; font-size: 17px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #8fb8ff; }
+  .tile h3 { font-size: 33px; margin: 12px 0 10px; line-height: 1.15; }
+  .tile p { margin: 0; font-size: 22px; color: #c8d8f5; line-height: 1.35; }
+  .tile.paypal { background: linear-gradient(160deg, rgba(0, 112, 224, .45), rgba(0, 112, 224, .15)); border-color: rgba(61, 139, 255, .6); }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-top: 46px; }
+  .two h2 { font-size: 34px; margin: 0 0 18px; color: #8fb8ff; font-weight: 700; }
+  .item { display: flex; gap: 18px; align-items: flex-start; padding: 18px 22px; border-radius: 18px; background: rgba(255, 255, 255, .07); margin-bottom: 14px; }
+  .item i { font-style: normal; flex: 0 0 auto; width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; font-weight: 800; font-size: 24px; background: var(--ok); }
+  .item.try i { background: var(--blue); }
+  .item b { display: block; font-size: 29px; }
+  .item span { display: block; font-size: 22px; color: #b9cbea; margin-top: 4px; }
+  .item code { font-family: Consolas, monospace; color: #9fc2ff; font-size: 21px; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+// Drawn for 1920 x 1080; scaled to whatever window it is shown in.
+document.documentElement.style.zoom = String(innerWidth / 1920);
+const P = new URLSearchParams(location.search || location.hash.slice(1));
+const SCENE = P.get("scene") || "title";
+const DUR = Number(P.get("dur") || 20) * 1000;
+const root = document.getElementById("root");
+const at = (frac, fn) => setTimeout(fn, Math.max(0, frac * DUR));
+const html = (s) => { const t = document.createElement("template"); t.innerHTML = s.trim(); return t.content.firstElementChild; };
+const show = (el) => requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add("in")));
+function setHead(el, text) { el.style.opacity = 0; setTimeout(() => { el.innerHTML = text; el.style.opacity = 1; }, 350); }
+function count(el, to, ms, fmt = (n) => String(n)) {
+  const t0 = performance.now();
+  const step = (t) => { const k = Math.min(1, (t - t0) / ms); el.textContent = fmt(Math.round(to * (1 - Math.pow(1 - k, 3)))); if (k < 1) requestAnimationFrame(step); };
+  requestAnimationFrame(step);
+}
+
+// 40 invented orders; the same data in the problem and the solution.
+const ORDERS = Array.from({ length: 40 }, (_, i) => ({ n: 5001 + i, p: "HM-300" }));
+const TAGS = { 3: "HM300", 9: "HM-3000", 14: "no batch code", 21: "2 payments", 27: "shipped 2 batches", 33: "typed by hand" };
+const READY = [0, 1, 2, 3, 4, 5, 6, 7, 10, 11, 12, 15, 16, 18, 19, 22, 23, 24, 26, 28, 30, 31, 35, 36];
+const HELD = [14, 21, 27, 33, 38, 8, 17];
+const role = (i) => (READY.includes(i) ? "ready" : HELD.includes(i) ? "held" : "out");
+
+function makeCards(stage) {
+  return ORDERS.map((o, i) => {
+    const c = html(`<div class="card"><div class="n">#${o.n}</div><div class="p">${o.p}</div><div class="badge">?</div><div class="tag"></div><div class="dots"><span class="dot"></span><span class="dot"></span></div></div>`);
+    c.querySelector(".dots").style.display = "none";
+    stage.append(c);
+    return c;
+  });
+}
+const gridPos = (i) => ({ x: (i % 8) * 136, y: Math.floor(i / 8) * 122 });
+function place(c, { x, y }, delay = 0) { c.style.transitionDelay = `${delay}ms`; c.style.transform = `translate(${x}px, ${y}px)`; }
+
+const scenes = {
+  title() {
+    root.append(html(`<div class="scene"><div class="center">
+      <div class="logo fade" id="a">MG</div>
+      <h1 class="fade" id="b">Make Good</h1>
+      <p class="fade" id="c">Product recall refunds through PayPal, with proof behind every payment.</p>
+      <div class="chips fade" id="d"><span class="chip">PayPal REST APIs</span><span class="chip">Tested on the PayPal sandbox</span><span class="chip">Google Gemini</span><span class="chip">People decide, AI proposes</span></div>
+    </div></div>`));
+    ["a", "b", "c", "d"].forEach((id, k) => at(0.04 + k * 0.12, () => show(document.getElementById(id))));
+  },
+
+  problem() {
+    const s = html(`<div class="scene"><div class="eyebrow fade" id="eb">The problem</div><div class="head swap" id="hd">A supplier recalls one faulty batch.</div><div class="stage" id="st"></div><div class="side" id="sd"></div><div class="big-end fade" id="end"><span>Either way, trust breaks.</span></div></div>`);
+    root.append(s);
+    show(document.getElementById("eb"));
+    const hd = document.getElementById("hd"), sd = document.getElementById("sd"), stage = document.getElementById("st");
+    const notice = html(`<div class="notice fade"><div style="font:700 20px/1 Segoe UI;letter-spacing:.1em;color:#b0223b">SAFETY RECALL NOTICE</div><div style="margin-top:12px">HM-300 hand mixer.<br>Speed controller can overheat.<br><b>Batch B-2217 only.</b></div></div>`);
+    sd.append(notice); at(0.03, () => show(notice));
+    const cards = makeCards(stage);
+    at(0.15, () => { setHead(hd, "Which customers received it?"); cards.forEach((c, i) => { place(c, gridPos(i)); c.style.transitionDelay = `${i * 22}ms`; c.style.opacity = 1; }); });
+    at(0.28, () => {
+      notice.style.display = "none";
+      const a = html(`<div class="pill yes fade"><i>✓</i>PayPal knows who paid</div>`), b = html(`<div class="pill no fade"><i>?</i>Nobody knows which batch they got</div>`);
+      sd.append(a, b); show(a); setTimeout(() => show(b), 600);
+    });
+    at(0.42, () => {
+      setHead(hd, "And the shop's records disagree.");
+      Object.entries(TAGS).forEach(([i, t], k) => setTimeout(() => { const c = cards[i]; c.querySelector(".tag").textContent = t; c.classList.add("tagged"); }, k * 260));
+    });
+    at(0.6, () => {
+      setHead(hd, "Refund everyone, or wait?");
+      sd.innerHTML = "";
+      const left = html(`<div class="panel fade"><h3>Refund everyone</h3><p>Money paid to buyers who were never affected</p><div class="counter red" style="margin-top:14px">$0</div></div>`);
+      const right = html(`<div class="panel fade"><h3>Wait and see</h3><p>Customers open disputes and chargebacks</p><div class="counter red" style="margin-top:14px">0</div></div>`);
+      sd.append(left, right); show(left); setTimeout(() => show(right), 500);
+      setTimeout(() => count(left.querySelector(".counter"), 1062, 2600, (n) => `$${n.toLocaleString("en-US")}`), 500);
+      setTimeout(() => {
+        count(right.querySelector(".counter"), 17, 3000);
+        [2, 5, 9, 12, 16, 19, 23, 25, 29, 31, 34, 37, 39, 6, 13, 20, 30].forEach((i, k) => setTimeout(() => { cards[i].classList.add("dispute"); cards[i].querySelector(".badge").textContent = "!"; }, k * 170));
+      }, 1100);
+    });
+    at(0.86, () => show(document.getElementById("end")));
+  },
+
+  solution() {
+    const s = html(`<div class="scene"><div class="eyebrow fade" id="eb">Our approach</div><div class="head swap" id="hd">Two questions for every buyer.</div>
+      <div class="questions fade" id="qs"><div class="q"><i>1</i>Is this their PayPal payment?</div><div class="q"><i>2</i>Was their unit affected?</div></div>
+      <div class="stage" id="st"></div><div class="side" id="sd" style="top:420px"></div><div class="big-end good fade" id="end"><span>Made whole before anyone opens a dispute.</span></div></div>`);
+    root.append(s);
+    show(document.getElementById("eb")); setTimeout(() => show(document.getElementById("qs")), 400);
+    const hd = document.getElementById("hd"), sd = document.getElementById("sd"), stage = document.getElementById("st");
+    stage.style.top = "420px";
+    const cards = makeCards(stage);
+    cards.forEach((c) => { c.querySelector(".dots").style.display = "flex"; c.querySelector(".badge").style.display = "none"; });
+    at(0.05, () => cards.forEach((c, i) => { place(c, gridPos(i)); c.style.transitionDelay = `${i * 18}ms`; c.style.opacity = 1; }));
+    at(0.16, () => cards.forEach((c, i) => setTimeout(() => {
+      const r = role(i), [a, b] = c.querySelectorAll(".dot");
+      a.className = `dot ${r === "out" ? "ok" : HELD.slice(0, 2).includes(i) ? "hold" : "ok"}`;
+      b.className = `dot ${r === "ready" ? "ok" : r === "held" ? "hold" : "no"}`;
+    }, i * 45)));
+    const cols = { ready: 0, held: 580, out: 870 };
+    const seen = { ready: 0, held: 0, out: 0 };
+    at(0.36, () => {
+      setHead(hd, "Sorted, with the reason for each.");
+      document.getElementById("qs").style.opacity = 0;
+      const heads = [["Ready to refund", "proven by records", 0], ["Held for a person", "the customer can be asked", 580], ["Not affected", "shown by records", 870]];
+      heads.forEach(([t, sub, x]) => { const h = html(`<div class="colhead" style="left:${x}px">${t}<small>${sub}</small></div>`); stage.append(h); show(h); });
+      cards.forEach((c, i) => {
+        const r = role(i), k = seen[r]++;
+        const perRow = r === "ready" ? 4 : 2;
+        c.classList.add(r);
+        place(c, { x: cols[r] + (k % perRow) * 132, y: Math.floor(k / perRow) * 62 }, i * 25);
+        c.style.height = "52px";
+        c.querySelector(".p").style.display = "none";
+        c.querySelector(".dots").style.display = "none";
+      });
+    });
+    at(0.55, () => {
+      setHead(hd, "One exact list. A person approves it.");
+      const lock = html(`<div class="lockbar">🔒 Approved list v1 &nbsp;<span class="mono">#9f2c41…</span></div>`);
+      stage.append(lock); show(lock);
+      const p = html(`<div class="panel fade"><h3>PayPal</h3><p>Refunded</p><div class="counter green" id="rf">0</div><p style="margin-top:10px">Disputes opened</p><div class="counter green">0</div><p style="margin-top:10px">Paid twice</p><div class="counter green">0</div></div>`);
+      sd.append(p); show(p);
+    });
+    at(0.68, () => {
+      setHead(hd, "PayPal refunds each one, once.");
+      const ready = cards.filter((c, i) => role(i) === "ready");
+      ready.forEach((c, k) => setTimeout(() => { c.classList.add("paid"); c.querySelector(".badge").style.display = "grid"; c.querySelector(".badge").textContent = "✓"; }, k * 110));
+      count(document.getElementById("rf"), ready.length, ready.length * 110);
+      setTimeout(() => cards.filter((c, i) => HELD.slice(0, 3).includes(i)).forEach((c) => { c.classList.remove("held"); c.classList.add("paid"); document.getElementById("rf").textContent = String(ready.length + 3); }), ready.length * 110 + 300);
+    });
+    at(0.86, () => show(document.getElementById("end")));
+  },
+
+  stack() {
+    const tiles = [
+      ["paypal", "Money", "PayPal REST APIs", "Orders, captures, refunds, payouts, disputes, transaction search, webhooks"],
+      ["", "Proof", "PayPal sandbox", "The full recall case run with real test payments and 16 real refunds"],
+      ["", "Backend", "Node.js 24 + TypeScript", "Fastify 5 and Zod, run directly with no build step"],
+      ["", "Data", "PostgreSQL", "Plain SQL migrations, an append-only audit trail, a job queue in the database"],
+      ["", "AI", "Google Gemini", "Reads the notice and explains holds. Code checks every quote; it decides nothing"],
+      ["", "Screens", "HTML, CSS, JavaScript", "No framework. One page, one step after another"],
+      ["", "Tests", "120 automated tests", "Node's test runner, with a PayPal simulator for failures on demand"],
+      ["", "Browser", "Playwright + Edge", "Clicks through the whole case in a real browser, 15 checks"],
+    ];
+    const s = html(`<div class="scene"><div class="eyebrow fade" id="eb">How it is built</div><div class="head fade" id="hd" style="min-height:0">Built with</div><div class="tiles" id="tl"></div></div>`);
+    root.append(s); show(document.getElementById("eb")); show(document.getElementById("hd"));
+    const tl = document.getElementById("tl");
+    tiles.forEach(([cls, k, t, d], i) => { const el = html(`<div class="tile ${cls} fade"><span class="k">${k}</span><h3>${t}</h3><p>${d}</p></div>`); tl.append(el); at(0.04 + i * 0.09, () => show(el)); });
+  },
+
+  trust() {
+    const s = html(`<div class="scene"><div class="eyebrow fade" id="eb">Credibility</div><div class="head fade" id="hd" style="min-height:0">Check it, then test it your way</div>
+      <div class="two"><div id="l"><h2 class="fade" id="lh">Why you can trust it</h2></div><div id="r"><h2 class="fade" id="rh">Try it yourself</h2></div></div></div>`);
+    root.append(s); show(document.getElementById("eb")); show(document.getElementById("hd"));
+    const left = [
+      ["Every screen says what is simulated", "\"PayPal: simulator, no real money\" and \"synthetic (invented)\""],
+      ["Run on the real PayPal sandbox", "16 real refunds, PayPal's own IDs in <code>docs/VERIFICATION.md</code>"],
+      ["120 automated tests", "<code>npm test</code>"],
+      ["The whole page, in a real browser", "<code>npm run test:e2e</code>"],
+    ];
+    const right = [
+      ["Upload your own orders", "Question 2: a CSV file, checked before import"],
+      ["Send yourself the customer link", "Open a held record: Email the customer a link"],
+      ["Make PayPal lose a reply", "Question 7: Lose one reply from PayPal"],
+      ["Use your PayPal sandbox", "<code>npm run sandbox:recall</code>"],
+    ];
+    at(0.02, () => show(document.getElementById("lh")));
+    left.forEach(([b, t], i) => { const el = html(`<div class="item fade"><i>✓</i><div><b>${b}</b><span>${t}</span></div></div>`); document.getElementById("l").append(el); at(0.06 + i * 0.1, () => show(el)); });
+    at(0.47, () => show(document.getElementById("rh")));
+    right.forEach(([b, t], i) => { const el = html(`<div class="item try fade"><i>${i + 1}</i><div><b>${b}</b><span>${t}</span></div></div>`); document.getElementById("r").append(el); at(0.52 + i * 0.1, () => show(el)); });
+  },
+
+  close() {
+    root.append(html(`<div class="scene"><div class="center">
+      <div class="logo fade" id="a">MG</div>
+      <h1 class="fade" id="b">Make Good</h1>
+      <p class="fade" id="c">The right customers, refunded once, with proof.</p>
+      <div class="chips fade" id="d"><span class="chip">github.com/shdra06/Make-Good</span><span class="chip">PayPal AI hackathon</span></div>
+    </div></div>`));
+    ["a", "b", "c", "d"].forEach((id, k) => at(0.02 + k * 0.1, () => show(document.getElementById(id))));
+  },
+};
+scenes[SCENE]();
+</script>
+</body>
+</html>

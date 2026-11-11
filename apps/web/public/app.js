@@ -407,7 +407,7 @@ function noticesCard() {
       chip(n && n.items.length ? `${n.items.length} emails` : "no emails yet")),
     h("p", { class: "sub", style: "margin-top:6px" }, "A customer is told they were paid only after PayPal confirmed the payment, and only once. Emails are saved as files in the outbox (apps/api/.data/outbox); nothing is sent over the internet yet."),
     paid && h("div", { class: "actions", style: "margin-top:0" }, h("button", { class: "btn", onclick: notifyPaid }, "Email the customers PayPal has paid")),
-    n && n.items.length > 0 && h("div", { class: "notices" }, n.items.map((m) => h("details", { class: "ev" },
+    n && n.items.length > 0 && h("div", { class: "notices" }, n.items.map((m) => h("details", { class: "mail" },
       h("summary", {}, chip(m.kind === "payment_sent" ? "paid" : "asked for batch code", m.kind === "payment_sent" ? "ok" : "hold"), " ",
         h("span", { class: "mono" }, m.order_number ? `#${m.order_number}` : ""), " ", h("span", {}, m.subject)),
       h("div", { class: "small muted" }, `To ${m.to_email}, ${day(m.created_at)} ${clock(m.created_at)}, saved as ${m.delivery_ref || "?"}`),
