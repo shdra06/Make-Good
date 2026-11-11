@@ -4,7 +4,30 @@ Written 10 Nov 2026.
 
 **How this was checked.** The endpoint names, fields, limits and permission names below were read from PayPal's published OpenAPI files in <https://github.com/paypal/paypal-rest-api-specifications> (folder `openapi/`), downloaded on 10 Nov 2026. Where a fact comes from somewhere else, or was not checked, the table says so.
 
-**What was not done.** No call in this document has been made against PayPal by this code. There are no PayPal keys on this machine yet. Everything marked "our use" is tested against a built-in simulator that follows the rules below.
+**What was run against PayPal.** On 11 Nov 2026 the script `apps/api/scripts/sandbox-verify.ts` (`npm run sandbox`) ran twice against the real PayPal sandbox with the keys in `make-good/.env`. Section 0 lists what PayPal answered. Anything not in section 0 has only run against the built-in simulator.
+
+## 0. What the sandbox showed (11 Nov 2026)
+
+| Question | PayPal's answer |
+|---|---|
+| Do the keys work, and what may this app do? | Yes. 28 permissions. Granted: refunds, payouts, read disputes, webhooks. **Not granted: Transaction Search, partner referrals.** |
+| Can test payments be created without a person approving them? | Yes, with a test card through the Orders API. The test script does this; the product itself never takes payments. |
+| Fetch a payment by ID | Works. A made-up ID gives `404 INVALID_RESOURCE_ID`. |
+| Partial refund, full refund of the rest | Both `COMPLETED` at once. The payment shows `PARTIALLY_REFUNDED`, then `REFUNDED`. |
+| The same request ID sent again | PayPal returns the **same refund** and moves no money. |
+| The same request ID with a different amount | PayPal still returns the first refund, with the first amount. The request ID wins over the body. |
+| A reply lost after PayPal acted | Our operation went to `unknown`. Asking again with the same request ID returned the refund PayPal had already made. Refunding what was left then gave exactly the expected remainder, so only one refund had happened. |
+| Refund more than is left | `422 REFUND_AMOUNT_EXCEEDED` |
+| Refund in another currency | `422 REFUND_CAPTURE_CURRENCY_MISMATCH` (not the name we had assumed) |
+| Too many decimal places | `422 DECIMAL_PRECISION` |
+| Refund a fully refunded payment | `422 CAPTURE_FULLY_REFUNDED` |
+| Transaction Search | `403 NOT_AUTHORIZED`. The permission must be switched on for the app in the developer dashboard. |
+| Disputes list for a payment | Answers with an empty list. No dispute existed to read. |
+| Payout of 1.00 USD to an address with no PayPal account | Batch `SUCCESS`, item `UNCLAIMED` with `RECEIVER_UNREGISTERED`. |
+| The same payout sent again | Refused with HTTP 400, "Batch with given sender_batch_id already exists", and the refusal names the original payout. |
+| Cancel that unclaimed payout | PayPal's sandbox answered `500 INTERNAL_SERVICE_ERROR` on every try. One 1.00 USD sandbox payout is left unclaimed; PayPal returns those after 30 days. |
+
+Not tried on the sandbox: a refund that stays pending, a balance too low to refund, a payment in dispute, a payment older than 180 days, a webhook, and a payout that is actually received.
 
 ## 1. The APIs we use
 
@@ -30,7 +53,7 @@ Written 10 Nov 2026.
 | Request | `amount` (leave out for a full refund), `invoice_id` (max 127), `custom_id` (max 127), `note_to_payer` (max 255). Headers: `PayPal-Request-Id` (idempotency), `Prefer: return=representation` (full reply), `PayPal-Auth-Assertion` (when acting for another merchant) |
 | Returns | `id`, `status` (`COMPLETED`, `PENDING`, `FAILED`, `CANCELLED`), `amount`, `custom_id`, `seller_payable_breakdown` |
 | Limits | Refunds are in the currency of the capture. PayPal refunds an original payment for 180 days (from PayPal's help pages; not in the spec file). |
-| Errors | The spec lists only generic error names. The issue names we handle (`CAPTURE_FULLY_REFUNDED`, `REFUND_AMOUNT_EXCEEDED`, `REFUND_TIME_LIMIT_EXCEEDED`, `TRANSACTION_DISPUTED`, `REFUND_FAILED_INSUFFICIENT_FUNDS`, and others) come from PayPal's Payments error reference as quoted in the first project report. **Not re-checked today.** An issue name we do not know is treated as final, never retried automatically. |
+| Errors | The spec lists only generic error names. Seen from the sandbox: `CAPTURE_FULLY_REFUNDED`, `REFUND_AMOUNT_EXCEEDED`, `DECIMAL_PRECISION`, `REFUND_CAPTURE_CURRENCY_MISMATCH`, `INVALID_RESOURCE_ID`. Handled but never triggered by us: `REFUND_TIME_LIMIT_EXCEEDED`, `TRANSACTION_DISPUTED`, `REFUND_FAILED_INSUFFICIENT_FUNDS` and others, taken from PayPal's error reference as quoted in the first project report. An issue name we do not know is treated as final, never retried automatically. |
 | Sandbox | Yes |
 | Our use | One refund per affected customer, to the original capture. `custom_id` and `PayPal-Request-Id` both carry our operation key, so we can find the refund in PayPal's records later. |
 
@@ -100,7 +123,7 @@ Written 10 Nov 2026.
 | PayPal's fraud or risk scores, buyer complaints | No supported API gives them to a merchant app. No detector uses them. |
 | A published rate limit | As far as we know PayPal does not publish numbers (from its rate-limiting guide; not re-checked today). We space requests, honour `Retry-After` on a 429, and never count a 429 as a failure. |
 | A bulk refund call | The public API refunds one payment per call (from the research in the first report). That is the gap this product fills. |
-| How long PayPal keeps a refund request ID | Stated as 30 days for payouts in the spec. Not stated for refunds in the spec file. We stop repeating a request automatically after six hours and ask a person. **To confirm in the sandbox.** |
+| How long PayPal keeps a refund request ID | Stated as 30 days for payouts in the spec. Not stated for refunds in the spec file. On the sandbox a repeat within a minute returned the first refund; longer gaps were not tried. We stop repeating a request automatically after six hours and ask a person. |
 | The exchange rate PayPal will use | Not available in advance. Our rates are reference rates and are labelled as estimates. |
 
 ## 3. Connecting a merchant

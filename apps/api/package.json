@@ -15,7 +15,8 @@
     "migrate": "node src/platform/db/migrate-cli.ts",
     "test": "node --test \"test/**/*.test.ts\"",
     "typecheck": "tsc --noEmit",
-    "smoke": "node scripts/smoke.ts"
+    "smoke": "node scripts/smoke.ts",
+    "sandbox": "node scripts/sandbox-verify.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.7.0",

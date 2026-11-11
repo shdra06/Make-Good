@@ -1,6 +1,6 @@
 # Make Good: implementation checklist
 
-Last updated 10 Nov 2026. A line is marked **Verified** only after it ran and passed. The evidence column says what was run.
+Last updated 11 Nov 2026. A line is marked **Verified** only after it ran and passed. The evidence column says what was run.
 
 | Mark | Meaning |
 |---|---|
@@ -19,7 +19,11 @@ npm test
 npm run smoke
 ```
 
-`npm test` runs 82 automated tests against a real PostgreSQL engine running in-process (PGlite). `npm run smoke` drives a running server over HTTP. Neither touches PayPal: they use the built-in simulator.
+```bash
+npm run sandbox
+```
+
+`npm test` runs the automated tests against a real PostgreSQL engine running in-process (PGlite). `npm run smoke` drives a running server over HTTP. Neither touches PayPal: they use the built-in simulator. `npm run sandbox` is the one that talks to PayPal's real sandbox, using the keys in `make-good/.env`.
 
 ## Stage 1. Architecture and foundation
 
@@ -40,16 +44,25 @@ npm run smoke
 
 ## Stage 2. Core PayPal integration
 
+"Verified on the sandbox" means the call was made to PayPal's real sandbox on 11 Nov 2026 with `npm run sandbox` (two full runs), and PayPal's own answer was checked.
+
 | Item | State | Evidence |
 |---|---|---|
-| PayPal REST client: token, capture lookup, refund, refund lookup, Transaction Search, payouts, disputes, webhook check | Built, not verified | `src/modules/paypal/rest-client.ts`. Fields checked against PayPal's OpenAPI files. **Never called against the sandbox.** |
-| Real sandbox run of the above | **Blocked** | No PayPal keys in `make-good/.env` or `apps/api/.env` (both checked: every PayPal value is empty) |
-| Idempotent requests (one request ID per operation, for ever) | Verified on the simulator | `test/execution.test.ts` |
-| Transaction sync in 31-day slices, with paging | Verified on the simulator | `test/execution.test.ts`, smoke test |
-| Refund totals recomputed from PayPal's refund rows | Verified on the simulator | `test/execution.test.ts` |
+| Sign in to PayPal and read which permissions the app has | **Verified on the sandbox** | 28 permissions returned; refunds, payouts, disputes and webhooks granted |
+| Fetch a payment by its ID | **Verified on the sandbox** | 3 of 3 found and linked to orders, both runs |
+| Partial and full refunds | **Verified on the sandbox** | 6 product refunds across two runs, each `COMPLETED` at PayPal |
+| Look up a refund | **Verified on the sandbox** | Amount and status matched what we asked for |
+| A repeated request ID returns the same refund and moves no money | **Verified on the sandbox** | Same refund ID came back, both runs |
+| Recovery when PayPal acted but the reply was lost | **Verified on the sandbox** | Reply discarded on purpose; operation went to `unknown`; PayPal returned the first refund; exactly one refund existed |
+| PayPal's refusals: too much, already refunded, wrong currency, too many decimals, unknown ID | **Verified on the sandbox** | Real error names recorded in `docs/PAYPAL.md` |
+| Disputes list | **Verified on the sandbox** | The call answers. No dispute existed, so reading one is untested. |
+| Payouts: create, read back, and a repeat is refused with a pointer to the original | **Verified on the sandbox** (direct calls) | Payout `UNCLAIMED` as expected for an address with no account. The worker's payout path has run on the simulator only. |
+| Transaction Search sync | **Blocked** | PayPal answered `403 NOT_AUTHORIZED`: this app does not have the Transaction Search permission. Works on the simulator. |
+| Refund totals recomputed from PayPal's refund rows | Verified on the simulator | Depends on Transaction Search |
+| Pending refunds, low balance, a dispute on the payment | Verified on the simulator only | Hard to cause on demand in the sandbox |
 | Webhooks: stored once, signature checked, unverified events never acted on | Verified on the simulator | `test/api.test.ts` "webhooks" |
-| Webhook signature check against real PayPal | Built, not verified | Needs keys and a public address |
-| Partner onboarding (PayPal's consent screen) | Built, not verified | Request shape follows the spec. **Needs PayPal partner approval**, see `docs/PAYPAL.md` |
+| Webhook signature check against real PayPal | Built, not verified | Needs a registered webhook and a public address |
+| Partner onboarding (PayPal's consent screen) | Built, not verified | PayPal's permission list confirms this app is not a partner. **Needs PayPal partner approval.** |
 
 ## Stage 3. Merchant and commerce integration
 
@@ -61,7 +74,9 @@ npm run smoke
 | WooCommerce connector | Not built | Needs a test store |
 | Shopify connector | Not built | Needs a Shopify partner account and a development store |
 | CSV upload | Not built | |
-| Real test store linked to real sandbox payments | **Blocked** | Needs PayPal keys and a store |
+| Orders linked to real sandbox payments by PayPal's payment ID | **Verified on the sandbox** | The orders came through the import format, not from a store |
+| Fetching a payment by ID when Transaction Search is behind or not permitted | Verified on the simulator and the sandbox | `test/execution.test.ts`, `npm run sandbox` |
+| A real store (WooCommerce or Shopify) as the source of those orders | **Blocked** | Needs a test store |
 
 ## Stage 4. Incidents and matching
 
@@ -89,7 +104,7 @@ npm run smoke
 | Dry run (preview) that writes nothing and calls nothing | Verified | `test/execution.test.ts` |
 | Approval: roles, second person, approval bound to the exact contents | Verified | `test/execution.test.ts` "approval rules" |
 | Durable job queue in PostgreSQL, at-least-once, with leases | Verified | `test/execution.test.ts` |
-| Lost reply after PayPal acted: resolved, one refund | Verified on the simulator | `test/execution.test.ts` |
+| Lost reply after PayPal acted: resolved, one refund | Verified on the simulator **and on the sandbox** | `test/execution.test.ts`, `npm run sandbox` |
 | Request never arrived: retried, one refund | Verified on the simulator | `test/execution.test.ts` |
 | Worker stops mid-call: found by the sweep, resolved, one refund | Verified on the simulator | `test/execution.test.ts` |
 | Same job twice, two workers at once | Verified in one process | `test/execution.test.ts`. **Not yet verified with two separate database connections**, see below |
@@ -148,7 +163,10 @@ The API the screens need exists and is tested. The old prototype's console in `m
 
 ## Blocked on you
 
-1. **PayPal sandbox keys.** Both `.env` files are empty. With keys I can run every "Built, not verified" PayPal line against the sandbox.
+1. **Transaction Search permission.** In the PayPal developer dashboard, open the app and tick Transaction Search under its features. PayPal currently answers `403 NOT_AUTHORIZED`. Without it, payments are fetched one by one from the IDs that orders carry, which works, but duplicate-charge detection and history have nothing to read on a real account.
 2. **A store to connect.** A WooCommerce test site or a Shopify development store, for a real connector.
 3. **A Claude key**, when claims are built.
-4. **PayPal partner approval.** Only matters for a hosted product serving other merchants. Not needed for the hackathon.
+4. **A public address and a registered webhook**, to check webhook signatures against PayPal.
+5. **PayPal partner approval.** Only matters for a hosted product serving other merchants. Not needed for the hackathon.
+
+Done since the first version of this list: the PayPal sandbox keys are in `make-good/.env` and work.
