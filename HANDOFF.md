@@ -12,7 +12,7 @@ A PayPal hackathon project. When a supplier recalls one batch of a product, Make
 |---|---|
 | `apps/api/` | The platform backend. Fastify, TypeScript run directly by Node 24 (no build), PostgreSQL via PGlite locally. Port 4000. |
 | `apps/web/public/` | The page: `index.html`, `app.js`, `styles.css`. Plain JS, no build. Served by the API. |
-| `apps/api/db/migrations/` | `0001` to `0003`. Applied files are never edited; add `0004_…`. |
+| `apps/api/db/migrations/` | `0001` to `0004`. Applied files are never edited; add `0005_…`. |
 | `docs/CHECKLIST.md` | Status of everything, with evidence. Change it only after something ran and passed. |
 | `docs/` others | `STRATEGY.md`, `DEMO.md`, `ARCHITECTURE.md`, `PAYPAL.md`, `VERIFICATION.md` |
 | `src/`, `public/` (repo root) | The first prototype. Leave it alone. |
@@ -27,6 +27,7 @@ Key backend modules (`apps/api/src/modules/`):
 | `recovery/map.ts` | Recovery Map, `comparePolicies`, `findLookalikes` |
 | `evidence/` | `extract.ts` (readers + check), `ai.ts` (Claude, shared prompts), `gemini.ts` (Gemini), `service.ts` |
 | `evaluation/service.ts` | Accuracy against known answers |
+| `notify/` | `mailer.ts` (file outbox), `notices.ts` (batch-code request email, "you were paid" email) |
 | `demo/recall-scenario.ts` | The 32-order synthetic recall case, used by simulator and sandbox |
 | `paypal/` | `rest-client.ts`, `simulator.ts`, `connections.ts` |
 | `api/routes.ts` | Every HTTP route |
@@ -35,7 +36,7 @@ Key backend modules (`apps/api/src/modules/`):
 
 | Command | Use |
 |---|---|
-| `npm test` | 118 tests, about 2 minutes. Must pass before every commit. |
+| `npm test` | 120 tests, about 2 minutes. Must pass before every commit. |
 | `npx tsc --noEmit` | Type check |
 | `npm start` | Server and page at http://localhost:4000. "Open the recall case" loads the demo. |
 | `npm run sandbox:recall` | The recall case on the real PayPal sandbox. About 8 minutes: run it in the background. |
@@ -68,14 +69,14 @@ AI: Gemini is used when `GEMINI_API_KEY` is set in `apps/api/.env` (Anthropic wi
 
 ## Work queue
 
-Do these in order. Tick each when it is tested, committed and pushed.
+Do these in order. Tick each when it is tested, committed and pushed. Item 5 is extra screens, not the core idea; 7 needs a test store; 8 is mostly covered by the customer link.
 
-- [x] 1. CSV order upload: `commerce/csv.ts`, `POST /stores/:storeId/orders/csv`, `test/csv.test.ts`. Left: an upload button on the page (API only today)
+- [x] 1. CSV order upload: `commerce/csv.ts`, `POST /stores/:storeId/orders/csv`, `test/csv.test.ts`, and the upload box in Question 2 (checks the file, then Import). Sample: `demo/sample-orders.csv`
 - [x] 2. Buyer link: `incidents/confirm.ts`, `/api/public/confirm/:token`, the page at `/?confirm=<token>`, button in the record drawer. The answer is evidence only; staff still decide. Checked in a browser
 - [x] 3. `Dockerfile` and `.github/workflows/ci.yml` written. **Neither has run**: no Docker here; check the first CI run on GitHub
 - [x] 4. Browser test in Microsoft Edge: `npm run test:e2e` (about 1 minute, AI off). `npm run demo:capture` records `demo/video/make-good-demo.mp4` (about 4 minutes, captions, real AI; not in git) and `demo/screens/*.png` (in git). Needs Edge and ffmpeg, so it is not in CI
 - [ ] 5. Other merchant screens: dashboard, monitoring, currencies, settings (API exists)
-- [ ] 6. Email notices (file transport first)
+- [x] 6. Email notices, file transport only (`.data/outbox/*.eml`): "Email the customer a link" in the record drawer, "Email the customers PayPal has paid" in Question 7 (only PayPal-confirmed payments, once each, test label in the subject). `test/notices.test.ts`, browser test. Not built: real sending (Resend)
 - [ ] 7. Shopify or WooCommerce connector (needs a test store)
 - [ ] 8. Claims portal with evidence upload
 
@@ -84,10 +85,10 @@ Blocked on the owner:
 - [x] AI key: Gemini key in `apps/api/.env`, verified. (Optional: an Anthropic key, then `npm run ai:verify`.)
 - [ ] Switch on Transaction Search for the PayPal app, then verify sync
 - [ ] Interview 3 to 5 shop owners (`docs/STRATEGY.md` section 5)
-- [ ] Record the demo (`docs/DEMO.md`)
+- [ ] Trim or voice the demo video (`docs/DEMO.md`); re-run `npm run demo:capture` first, the page changed
 
 Known loose end: another session's `integration/proposed-0002_…sql` (outside this repo) must become `0003` if it is ever applied.
 
 ## Last session
 
-11 Nov 2026 (fourth sitting, Opus): browser test and demo capture added; video (3 min 54 s) and 15 screenshots made with real Gemini; one retry added to Gemini calls. Next: work queue item 5, or edit the video for submission.
+11 Nov 2026 (fifth sitting, Opus): CSV upload box on the page, customer emails (file outbox, migration 0004), DEMO.md AI answer corrected. 120 tests and the 15-check browser test pass. Demo video not re-recorded. Next: re-record the video, or work queue item 5.

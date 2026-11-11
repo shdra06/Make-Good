@@ -190,7 +190,7 @@ An independent product review (10 Nov 2026) and the brief that followed it asked
 | The other merchant screens (dashboard, monitoring, currencies, settings, staff) | **Not built.** The API for them exists and is tested |
 | Customer claim pages | **Not built** |
 
-The page is `apps/web/public` (plain HTML, CSS and JavaScript, no build step), served by the API at http://localhost:4000. It has an automated browser test in Microsoft Edge (`npm run test:e2e`, 11 checks, passing on 11 Nov 2026). It is not in CI, because CI has no Edge. The old prototype's console in `make-good/public` still runs against the old prototype only.
+The page is `apps/web/public` (plain HTML, CSS and JavaScript, no build step), served by the API at http://localhost:4000. It has an automated browser test in Microsoft Edge (`npm run test:e2e`, 15 checks, passing on 11 Nov 2026, including CSV upload and customer emails). Customer emails are saved as files in `apps/api/.data/outbox` (`test/notices.test.ts`); nothing is sent over the internet. It is not in CI, because CI has no Edge. The old prototype's console in `make-good/public` still runs against the old prototype only.
 
 ## Stage 9. Hardening
 

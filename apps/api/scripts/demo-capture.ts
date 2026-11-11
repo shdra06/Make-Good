@@ -131,6 +131,15 @@ async function main(): Promise<number> {
     await caption(page, "Nothing applies until a person saves the rules, in their own name.", 2500);
 
     // ---- 2. who might be affected ----
+    // Orders from a spreadsheet: other products only, so the recall numbers do not change.
+    await page.locator("#s2 details.upload summary").click();
+    await page.locator("#csv-file").setInputFiles(path.join(REPO, "demo", "sample-orders.csv"));
+    await button(page, "Import 2 orders").waitFor({ timeout: 30_000 });
+    check("a CSV file is checked before import", (await text("#s2 .csv-result")).includes("3 rows, 2 orders"));
+    await button(page, "Import 2 orders").click();
+    const imported = await page.locator("#s2 .csv-result").filter({ hasText: "imported (2 new" }).waitFor({ timeout: 30_000 }).then(() => true, () => false);
+    check("a CSV file imports orders", imported, imported ? "" : await page.locator(".toast").first().innerText().catch(() => "no message"));
+    await page.locator("#s2 details.upload summary").click();
     await button(page, "Find affected customers").click();
     await page.locator("#s2 .matrix").waitFor({ timeout: 60_000 });
     await scrollTo(page, "#s2");
@@ -186,9 +195,10 @@ async function main(): Promise<number> {
 
     // The customer link
     await page.locator("#s3 .row").filter({ hasText: "#5020" }).first().click();
-    await button(page, "Make a link to ask the customer").click();
+    await button(page, "Email the customer a link").click();
+    await page.locator(".drawer").getByText("Saved in the outbox").waitFor({ timeout: 30_000 });
     const link = await page.locator(".drawer input[readonly]").inputValue();
-    check("a one-use customer link is made", link.includes("?confirm="));
+    check("a one-use customer link is emailed", link.includes("?confirm="));
     await page.goto(link);
     await page.getByText("One question about your order").waitFor();
     await caption(page, "Or ask the customer: a one-use link asks only for the batch code on their unit.", 3000);
@@ -252,6 +262,18 @@ async function main(): Promise<number> {
     check("results against the known answers", s7.includes("units called proven that were not affected"));
     await caption(page, "Checked against the known answers of the invented data: nobody wrongly proven, nothing paid twice.", 4500);
     await shot(page, "results", "#s7 .kpis");
+    await button(page, "Email the customers PayPal has paid").click();
+    await page.locator("#s7").filter({ hasText: "[TEST: PayPal simulator, no real money]" }).waitFor({ timeout: 30_000 });
+    const told = await page.locator("#s7 .notices details").count();
+    const paidCount = await page.locator("#s7 table.plain tbody tr").filter({ hasText: "Paid" }).count();
+    check("each paid customer is emailed once, after PayPal confirmed", told === paidCount + 1, `${told} emails, ${paidCount} paid, 1 batch-code request`);
+    await button(page, "Email the customers PayPal has paid").click();
+    await page.getByText(/0 emailed, \d+ already told/).first().waitFor({ timeout: 30_000 });
+    check("pressing it again emails nobody twice", (await page.locator("#s7 .notices details").count()) === told);
+    await page.locator("#s7 .notices details").first().click();
+    await scrollTo(page, "#s7 .notices");
+    await caption(page, "Customers are told only after PayPal confirmed their payment, once, with PayPal's reference.", 4000);
+    await shot(page, "customer-emails", "#s7 .notices");
     await scrollTo(page, "#s7 .audit");
     await caption(page, "Every decision is on an audit trail that cannot be edited.", 3500);
     await shot(page, "audit-trail", "#s7 .card:last-of-type");

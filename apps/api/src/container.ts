@@ -17,6 +17,7 @@ import type { Deps as IdentityDeps } from "./modules/identity/service.ts";
 import { PayPalConnections } from "./modules/paypal/connections.ts";
 import { processProviderEvent } from "./modules/paypal/webhooks.ts";
 import { syncTransactions } from "./modules/transactions/sync.ts";
+import { FileMailer, type Mailer } from "./modules/notify/mailer.ts";
 
 export type Container = {
   config: Config;
@@ -32,9 +33,11 @@ export type Container = {
   fx: FxService;
   runner: JobRunner;
   handlers: Record<string, JobHandler>;
+  /** Customer emails. Null when EMAIL_TRANSPORT asks for a transport that is not built (only "file" is). */
+  mailer: Mailer | null;
 };
 
-export type Overrides = { db?: Db; clock?: Clock; fetchImpl?: typeof fetch; passwordCost?: ScryptCost; workerId?: string; ai?: EvidenceAi | null };
+export type Overrides = { db?: Db; clock?: Clock; fetchImpl?: typeof fetch; passwordCost?: ScryptCost; workerId?: string; ai?: EvidenceAi | null; mailer?: Mailer | null };
 
 export async function createContainer(config: Config, overrides: Overrides = {}): Promise<Container> {
   const clock = overrides.clock ?? systemClock;
@@ -52,6 +55,10 @@ export async function createContainer(config: Config, overrides: Overrides = {})
     : null;
   const connections = new PayPalConnections({ db, clock, secrets, config, fetchImpl: overrides.fetchImpl });
   const executor = new OperationExecutor({ db, clock, providers: connections.resolve });
+  const mailer: Mailer | null =
+    overrides.mailer !== undefined ? overrides.mailer
+    : config.email.transport === "file" ? new FileMailer({ dir: path.join(config.dataDir, "outbox"), from: config.email.from })
+    : null;
   const fx = new FxService({ db, clock, apiUrl: config.fxApiUrl, fetchImpl: overrides.fetchImpl });
 
   const handlers: Record<string, JobHandler> = {
@@ -79,7 +86,7 @@ export async function createContainer(config: Config, overrides: Overrides = {})
   });
 
   return {
-    config, db, clock, deps, ai, secrets, connections, executor, fx, runner, handlers,
+    config, db, clock, deps, ai, secrets, connections, executor, fx, runner, handlers, mailer,
     identity: { db, clock, passwordCost: overrides.passwordCost },
   };
 }

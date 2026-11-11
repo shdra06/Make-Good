@@ -227,3 +227,7 @@ table.plain tr:last-child td { border-bottom: 0; }
 .busy { position: fixed; top: 0; left: 0; right: 0; height: 3px; z-index: 70; background: linear-gradient(90deg, transparent, var(--accent), transparent); background-size: 40% 100%; background-repeat: no-repeat; animation: slide 1s linear infinite; }
 @keyframes slide { from { background-position: -40% 0; } to { background-position: 140% 0; } }
 @media (prefers-reduced-motion: reduce) { .busy { animation: none; background: var(--accent); } html { scroll-behavior: auto; } }
+
+/* customer emails and CSV upload */
+pre.email { white-space: pre-wrap; font: inherit; font-size: 13px; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 10px; margin: 8px 0 0; }
+.notices details summary, .upload summary { cursor: pointer; }

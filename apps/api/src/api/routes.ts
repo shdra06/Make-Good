@@ -4,7 +4,8 @@
 import { z } from "zod";
 import type { Container } from "../container.ts";
 import { DAY } from "../platform/clock.ts";
-import { ConflictError, NotFoundError, ValidationError } from "../platform/errors.ts";
+import { ConflictError, NotConfiguredError, NotFoundError, ValidationError } from "../platform/errors.ts";
+import { emailConfirmLink, listNotices, notifyPaidCustomers } from "../modules/notify/notices.ts";
 import { enqueue } from "../platform/jobs/queue.ts";
 import { CSV_COLUMNS, ordersFromCsv } from "../modules/commerce/csv.ts";
 import { BatchImport, OrderImport, upsertBatch, upsertOrder } from "../modules/commerce/ingest.ts";
@@ -393,6 +394,26 @@ export function buildApp(c: Container): Router {
       const { token } = await createConfirmLink(c.deps, { orgId: org.orgId, candidateId: params.candidateId, userId: user.id });
       return { url: `${c.config.publicUrl}/?confirm=${token}` };
     },
+  });
+  const mailer = () => {
+    if (!c.mailer) throw new NotConfiguredError("EMAIL_NOT_SET_UP", "Only EMAIL_TRANSPORT=file is built: emails are saved to files in the outbox, not sent.");
+    return c.mailer;
+  };
+  route({
+    method: "POST", path: "/api/orgs/:orgId/candidates/:candidateId/confirm-email", summary: "Make the customer link and email it to the customer (saved to the outbox file; not sent over the internet)", tag: "Incidents",
+    auth: { permission: "candidate.decide" }, params: OrgParams.extend({ candidateId: uuid }),
+    handler: async ({ params, org, user }) =>
+      emailConfirmLink(c.deps, mailer(), { orgId: org.orgId, candidateId: params.candidateId, userId: user.id, publicUrl: c.config.publicUrl }),
+  });
+  route({
+    method: "POST", path: "/api/orgs/:orgId/incidents/:incidentId/notices/paid", summary: "Email every customer whose payment PayPal confirmed and who has not been told yet", tag: "Incidents",
+    auth: { permission: "batch.execute" }, params: Incident,
+    handler: async ({ params, org, user }) => notifyPaidCustomers(c.deps, mailer(), { orgId: org.orgId, incidentId: params.incidentId, userId: user.id }),
+  });
+  route({
+    method: "GET", path: "/api/orgs/:orgId/incidents/:incidentId/notices", summary: "Every email sent to customers for this incident, word for word", tag: "Incidents",
+    auth: { permission: "org.read" }, params: Incident,
+    handler: async ({ params, org }) => ({ transport: c.mailer?.transport ?? null, items: await listNotices(c.db, org.orgId, params.incidentId) }),
   });
   route({
     method: "GET", path: "/api/public/confirm/:token", summary: "What a customer is asked through a confirmation link", tag: "Public", auth: "public",

@@ -131,7 +131,7 @@ const state = {
   map: null, evidence: null, rows: [], incident: null, evaluation: null, policies: null, preview: null,
   batch: null, manifest: null, audit: null, aliases: null, reconciliation: [],
   lastMatch: null, filter: null, detail: null, priceWith: "current",
-  busy: 0, toast: null, form: {},
+  busy: 0, toast: null, form: {}, upload: null, notices: null,
 };
 let pollTimer = null;
 let toastTimer = null;
@@ -201,7 +201,7 @@ async function boot() {
 
 async function refresh() {
   if (!state.org || !state.incidentId) return;
-  const [map, evidence, list, incident, evaluation, audit, recon] = await Promise.all([
+  const [map, evidence, list, incident, evaluation, audit, recon, notices] = await Promise.all([
     get(`${incUrl()}/recovery-map`),
     get(`${incUrl()}/evidence`),
     get(`${incUrl()}/candidates?size=200&includeCleared=true`),
@@ -209,8 +209,9 @@ async function refresh() {
     get(`${incUrl()}/evaluation`),
     get(`${orgUrl()}/audit?size=60`).catch(() => null),
     get(`${orgUrl()}/reconciliation`).catch(() => []),
+    get(`${incUrl()}/notices`).catch(() => null),
   ]);
-  Object.assign(state, { map, evidence, rows: list.rows, incident, evaluation, audit, reconciliation: recon });
+  Object.assign(state, { map, evidence, rows: list.rows, incident, evaluation, audit, reconciliation: recon, notices });
   if (map.rule) {
     const policies = state.priceWith === "current" ? undefined : DEFAULT_POLICIES.map((p) => ({ ...p, compensation: RULES[state.priceWith].rule }));
     [state.policies, state.preview] = await Promise.all([post(`${incUrl()}/policies/compare`, policies ? { policies } : {}), get(`${incUrl()}/preview`)]);
@@ -339,6 +340,79 @@ const reconcile = () => run(async () => {
 const makeLink = () => run(async () => {
   state.detail.link = (await post(`${orgUrl()}/candidates/${state.detail.id}/confirm-link`)).url;
 });
+
+const emailLink = () => run(async () => {
+  const sent = await post(`${orgUrl()}/candidates/${state.detail.id}/confirm-email`);
+  state.detail.link = sent.url;
+  state.detail.emailedTo = sent.to;
+  await refresh();
+}, "The email with the link is saved in the outbox.");
+
+const notifyPaid = () => run(async () => {
+  const r = await post(`${incUrl()}/notices/paid`);
+  await refresh();
+  const parts = [`${r.sent} emailed`];
+  if (r.alreadyTold) parts.push(`${r.alreadyTold} already told`);
+  if (r.noEmail) parts.push(`${r.noEmail} with no email address`);
+  if (r.notConfirmedYet) parts.push(`${r.notConfirmedYet} not confirmed by PayPal yet, so not told`);
+  toast(parts.join(", ") + ".");
+});
+
+// ---------- orders from a CSV file ----------
+
+async function storeForCsv() {
+  const stores = await get(`${orgUrl()}/stores`);
+  const found = stores.find((s) => s.kind === "csv") || stores[0];
+  if (found) return found.id;
+  return (await post(`${orgUrl()}/stores`, { name: "Spreadsheet upload", kind: "csv" })).id;
+}
+
+const pickCsv = (e) => run(async () => {
+  const file = e.target.files && e.target.files[0];
+  if (!file) return;
+  const csv = await file.text();
+  const storeId = await storeForCsv();
+  const result = await post(`${orgUrl()}/stores/${storeId}/orders/csv`, { csv, dryRun: true });
+  state.upload = Object.assign(state.upload || {}, { name: file.name, csv, storeId, result, open: true });
+});
+
+const importCsv = () => run(async () => {
+  const u = state.upload;
+  u.result = await post(`${orgUrl()}/stores/${u.storeId}/orders/csv`, { csv: u.csv, dryRun: false });
+  u.csv = null;
+  await refresh();
+}, "Orders imported. Run the match again to include them.");
+
+function ordersUpload() {
+  const u = state.upload;
+  const r = u && u.result;
+  return h("details", { class: "card pad upload", style: "margin:0 0 14px", open: !!(u && u.open), ontoggle: (e) => { state.upload = state.upload || {}; state.upload.open = e.target.open; } },
+    h("summary", {}, h("b", {}, "Add orders from a spreadsheet (CSV)")),
+    h("p", { class: "small muted", style: "margin:8px 0" }, "One row per order line. Required columns: order_number, placed_at, currency, title, quantity, unit_price. Add sku, batch_code, shipped_at, customer_email and paypal_payment_id where you have them: they are what the match uses. The file is checked first; nothing is imported until you press Import, and a file with a bad row is not half-imported."),
+    h("input", { type: "file", accept: ".csv,text/csv", id: "csv-file", onchange: pickCsv }),
+    r && h("div", { class: "csv-result", style: "margin-top:10px" },
+      h("div", {}, `${u.name}: ${r.rows} rows, ${r.orders} orders`, r.imported ? `, imported (${r.created} new, ${r.updated} updated, ${r.links.exact} linked to a PayPal payment)` : ""),
+      r.errors.length > 0 && h("ul", { class: "small" }, r.errors.slice(0, 10).map((x) => h("li", {}, `Row ${x.row}: ${x.message}`))),
+      r.errors.length > 0 && h("p", { class: "small" }, "Fix these rows and choose the file again. Nothing was imported."),
+      !r.imported && r.errors.length === 0 && r.orders > 0 && h("button", { class: "btn primary small", onclick: importCsv }, `Import ${r.orders} orders`),
+      r.warnings && r.warnings.length > 0 && h("p", { class: "small muted" }, r.warnings.slice(0, 5).join(" "))));
+}
+
+function noticesCard() {
+  const n = state.notices;
+  const paid = state.batch && state.batch.operations.some((o) => o.state === "succeeded");
+  if (!paid && !(n && n.items.length)) return null;
+  return h("div", { class: "card pad", style: "margin-top:14px" },
+    h("div", { class: "manifest-head" }, h("h3", { style: "margin:0" }, "What customers were told"),
+      chip(n && n.items.length ? `${n.items.length} emails` : "no emails yet")),
+    h("p", { class: "sub", style: "margin-top:6px" }, "A customer is told they were paid only after PayPal confirmed the payment, and only once. Emails are saved as files in the outbox (apps/api/.data/outbox); nothing is sent over the internet yet."),
+    paid && h("div", { class: "actions", style: "margin-top:0" }, h("button", { class: "btn", onclick: notifyPaid }, "Email the customers PayPal has paid")),
+    n && n.items.length > 0 && h("div", { class: "notices" }, n.items.map((m) => h("details", { class: "ev" },
+      h("summary", {}, chip(m.kind === "payment_sent" ? "paid" : "asked for batch code", m.kind === "payment_sent" ? "ok" : "hold"), " ",
+        h("span", { class: "mono" }, m.order_number ? `#${m.order_number}` : ""), " ", h("span", {}, m.subject)),
+      h("div", { class: "small muted" }, `To ${m.to_email}, ${day(m.created_at)} ${clock(m.created_at)}, saved as ${m.delivery_ref || "?"}`),
+      h("pre", { class: "email" }, m.body)))));
+}
 
 const explain = () => run(async () => {
   state.detail.explanation = await post(`${orgUrl()}/candidates/${state.detail.id}/explain`);
@@ -558,6 +632,7 @@ function s2() {
     map.lastMatch && h("span", { class: "small muted" }, `Last run ${clock(map.lastMatch.finished_at)}.`),
     state.lastMatch && state.lastMatch.disputes && h("span", { class: "small muted" },
       state.lastMatch.disputes.failed ? state.lastMatch.disputes.failed : `PayPal was asked about disputes on ${state.lastMatch.disputes.checked} payments: ${state.lastMatch.disputes.open} open.`)));
+  body.push(ordersUpload());
   if (!map.lastMatch) return section("s2", 2, "Who might be affected?", "Two separate questions are answered for every buyer of the product.", ...body);
 
   const live = map.matrix.reduce((a, m) => a + m.count, 0);
@@ -735,7 +810,9 @@ function confirmForm() {
       h("select", { onchange: (e) => (state.form.basis = e.target.value) }, BASIS.map(([k, t]) => h("option", { value: k, selected: state.form.basis === k }, t)))),
     h("label", { class: "field" }, h("span", {}, "Note"), h("textarea", { placeholder: "For example: customer sent a photo of the label, B-2217", oninput: (e) => (state.form.note = e.target.value) })),
     h("div", { class: "actions" }, h("button", { class: "btn primary", onclick: () => decideRecord("confirm") }, "Confirm this customer"), h("button", { class: "btn danger", onclick: () => decideRecord("decline") }, "Decline"),
-      h("button", { class: "btn", onclick: makeLink }, "Make a link to ask the customer")),
+      h("button", { class: "btn", onclick: makeLink }, "Make a link to ask the customer"),
+      h("button", { class: "btn", onclick: emailLink }, "Email the customer a link")),
+    state.detail.emailedTo && h("p", { class: "small", style: "margin-top:8px" }, `Emailed to ${state.detail.emailedTo}. Saved in the outbox as a file; not sent over the internet.`),
     state.detail.link && h("label", { class: "field", style: "margin-top:10px" }, h("span", {}, "Send this link to the customer. It works once. Their answer appears here as evidence; you still decide."),
       h("input", { type: "text", readonly: true, value: state.detail.link, onfocus: (e) => e.target.select() })));
 }
@@ -905,6 +982,7 @@ function s7() {
     }
   }
 
+  if (started) body.push(noticesCard());
   if (evaluation.available && started) body.push(kpis(evaluation));
   if (audit) {
     body.push(h("div", { class: "card pad", style: "margin-top:14px" },
