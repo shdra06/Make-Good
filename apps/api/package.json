@@ -23,7 +23,6 @@
     "demo:capture": "node scripts/demo-capture.ts"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^1.7.0",
     "@electric-sql/pglite": "^0.5.16",
     "@fastify/multipart": "*",
     "@fastify/static": "*",

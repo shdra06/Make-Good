@@ -4,7 +4,7 @@
 // Two readers produce the same shape:
 //   - pattern rules: plain text matching against the merchant's own catalogue.
 //     No AI. Always available.
-//   - Claude: reads the notice as a person would. Needs an API key.
+//   - Gemini: reads the notice as a person would. Needs GEMINI_API_KEY.
 //
 // Whichever reader ran, its output goes through the same check before anyone
 // sees it: every field must quote the exact words of the document it came

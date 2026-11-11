@@ -132,7 +132,7 @@ One run, 07:40 to 07:47 UTC, all 47 checks passed. The payments, refunds, lookup
 | Two payments with one invoice number | **PayPal refused the second: `DUPLICATE_INVOICE_ID`.** It was taken without an invoice number, so both orders pointed at the one payment that carried the number. Both were held as ambiguous. |
 | Read each payment by ID | 26 of 26 found. Transaction Search was not used (this app does not have it). |
 | The payment ID the store recorded wrongly | PayPal does not know it. The order is held: payment not found. |
-| Read the supplier notice | By pattern rules (no Claude key). Products HM-300 and HM-300-EU, batch B-2217. A person saved the rules. |
+| Read the supplier notice | By pattern rules (this run had no AI key). Products HM-300 and HM-300-EU, batch B-2217. A person saved the rules. |
 | Dispute check before matching | 19 payments asked about, 0 in dispute |
 | Match | 12 ready after two product-code aliases were confirmed by a person; 5 held for evidence of the unit; 3 held for the payment; 4 shown not to be affected |
 | Against the known answers | 18 of 21 affected units proven from records; 0 wrongly called proven; 5 held (3 truly affected, 2 not); 0 missed. 21 payments verified and right, 0 tied to the wrong order. 12 of 12 calculated amounts exact. |
@@ -176,7 +176,7 @@ Two faults were found this way and fixed: the sample loader missed refunds made 
 | PayPal sandbox | **Yes** | See section 2 |
 | PayPal live | No, and refused by default | |
 | Exchange rates (Frankfurter, European Central Bank) | **Yes** | `GET https://api.frankfurter.dev/v1/latest` and the date-range form both returned data; USD/EUR 0.89174 for 10 Nov 2026 |
-| Claude | **No** | No key on this machine. The Claude calls are written and tested with a stand-in model only. |
+| Google Gemini | **Yes** | `npm run ai:verify` on 11 Nov 2026: notice read, alias opinions, explanation, all checked. Claude was removed from the code the same day |
 | A store (WooCommerce, Shopify) | No | No connector built, no store available |
 | Email | No | Not built |
 

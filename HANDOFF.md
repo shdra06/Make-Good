@@ -25,7 +25,7 @@ Key backend modules (`apps/api/src/modules/`):
 | `incidents/service.ts` | `runIncidentMatch`, `decideCandidates`, `reconcilePayment` |
 | `execution/` | `batches.ts` (preview, create, revise, approve, start), `manifests.ts` (immutable list, drift, worker guard), `executor.ts` (calls PayPal) |
 | `recovery/map.ts` | Recovery Map, `comparePolicies`, `findLookalikes` |
-| `evidence/` | `extract.ts` (readers + check), `ai.ts` (Claude, shared prompts), `gemini.ts` (Gemini), `service.ts` |
+| `evidence/` | `extract.ts` (readers + check), `ai.ts` (prompts and answer shapes), `gemini.ts` (the Gemini client), `service.ts` |
 | `evaluation/service.ts` | Accuracy against known answers |
 | `notify/` | `mailer.ts` (file outbox), `notices.ts` (batch-code request email, "you were paid" email) |
 | `demo/recall-scenario.ts` | The 32-order synthetic recall case, used by simulator and sandbox |
@@ -65,7 +65,7 @@ Key backend modules (`apps/api/src/modules/`):
 
 Built and verified: two-question matching, approval manifests, Recovery Map, policy pricing, evidence reading by pattern rules, the synthetic data set, accuracy measurement, the page, and the whole case on the PayPal sandbox (16 real refunds). Details: `docs/CHECKLIST.md`, `docs/VERIFICATION.md`.
 
-AI: Gemini is used when `GEMINI_API_KEY` is set in `apps/api/.env` (Anthropic wins if both are set). The three AI steps are verified on real Gemini with `npm run ai:verify`. Not verified: Claude (no key), open disputes, Transaction Search, webhooks.
+AI: Gemini only (Claude was removed on 11 Nov 2026). Used when `GEMINI_API_KEY` is set in `apps/api/.env`; without it, pattern rules read the notice. The three AI steps are verified on real Gemini with `npm run ai:verify`. The free key hits its daily limit (HTTP 429) after many runs. Not verified: open disputes, Transaction Search, webhooks.
 
 ## Work queue
 
@@ -82,7 +82,7 @@ Do these in order. Tick each when it is tested, committed and pushed. Item 5 is 
 
 Blocked on the owner:
 
-- [x] AI key: Gemini key in `apps/api/.env`, verified. (Optional: an Anthropic key, then `npm run ai:verify`.)
+- [x] AI key: Gemini key in `apps/api/.env`, verified. Rotate it: it was pasted in a chat
 - [ ] Switch on Transaction Search for the PayPal app, then verify sync
 - [ ] Interview 3 to 5 shop owners (`docs/STRATEGY.md` section 5)
 - [ ] Trim or voice the demo video (`docs/DEMO.md`); re-run `npm run demo:capture` first, the page changed
@@ -91,4 +91,4 @@ Known loose end: another session's `integration/proposed-0002_…sql` (outside t
 
 ## Last session
 
-11 Nov 2026 (fifth sitting, Opus): CSV upload box on the page, customer emails (file outbox, migration 0004), DEMO.md AI answer corrected. 120 tests and the 15-check browser test pass. Demo video not re-recorded. Next: re-record the video, or work queue item 5.
+11 Nov 2026 (sixth sitting, Opus): Claude removed (code, config, SDK); Gemini is the only AI. 120 tests and the browser test pass. `npm run ai:verify` could not run: the Gemini key returned 429 (daily limit), re-run it tomorrow. Earlier the same day: CSV upload box and customer emails. Next: re-run ai:verify, re-record the video.

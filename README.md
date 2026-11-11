@@ -43,7 +43,7 @@ Three rules hold everywhere:
 2. Nothing is sent until a person approves one exact, unchangeable payment list. If anything under that list changes, the approval is withdrawn.
 3. Nothing is shown as paid until PayPal's own record says so. A lost reply is "unknown", never "failed" and never sent twice.
 
-What is not there yet: a Claude key has not been available, so the Claude calls are tested only with a stand-in model; no merchant has been interviewed; store connectors, the customer claims portal and email notices are not built. Live PayPal has never been used and is refused by default.
+The AI is Google Gemini (`GEMINI_API_KEY` in `apps/api/.env`), checked against the real API. What is not there yet: no merchant has been interviewed; store connectors and the customer claims portal are not built; customer emails are saved as files, not sent. Live PayPal has never been used and is refused by default.
 
 ---
 

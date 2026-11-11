@@ -1,5 +1,5 @@
 // Runs the three AI evidence steps against the REAL model configured in
-// apps/api/.env (Anthropic if ANTHROPIC_API_KEY is set, otherwise Gemini).
+// apps/api/.env (GEMINI_API_KEY).
 //
 //   npm run ai:verify
 //
@@ -32,7 +32,7 @@ async function main(): Promise<number> {
   const config = loadConfig({ ...process.env, NODE_ENV: "test", LOG_LEVEL: "silent" }, { readEnvFiles: false });
   const db = await openDb({ pglite: "memory" });
   await migrate(db);
-  const c = await createContainer({ ...config, anthropicApiKey: env.anthropicApiKey, gemini: env.gemini, model: env.model }, { db, passwordCost: { N: 1024, r: 8, p: 1 } });
+  const c = await createContainer({ ...config, gemini: env.gemini }, { db, passwordCost: { N: 1024, r: 8, p: 1 } });
   if (!c.ai) {
     say("find a model key", false, "set GEMINI_API_KEY or ANTHROPIC_API_KEY in apps/api/.env");
     return 1;

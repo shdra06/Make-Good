@@ -6,7 +6,7 @@
 //
 // It starts its own server on port 4100 with a fresh in-memory database and
 // the PayPal simulator, so nothing outside this machine is paid. In capture
-// mode the AI steps use the model in apps/api/.env (Gemini or Claude), if set.
+// mode the AI steps use the model in apps/api/.env (Gemini), if set.
 //
 // Output (capture mode): make-good/demo/screens/*.png, make-good/demo/video/make-good-demo.mp4
 
@@ -83,7 +83,7 @@ async function main(): Promise<number> {
   const db = await openDb({ pglite: "memory" });
   await migrate(db);
   const c = await createContainer(
-    { ...config, anthropicApiKey: useAi ? fromFile.anthropicApiKey : null, gemini: useAi ? fromFile.gemini : null, model: fromFile.model },
+    { ...config, gemini: useAi ? fromFile.gemini : null },
     { db, passwordCost: { N: 1024, r: 8, p: 1 } },
   );
   const { app } = buildApp(c);

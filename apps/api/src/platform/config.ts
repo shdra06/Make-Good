@@ -34,9 +34,7 @@ const Env = z.object({
   /** Platform credentials for PayPal seller onboarding (partner mode). Needs PayPal approval. */
   PAYPAL_PARTNER_CLIENT_ID: z.string().optional(),
   PAYPAL_PARTNER_CLIENT_SECRET: z.string().optional(),
-  ANTHROPIC_API_KEY: z.string().optional(),
-  MAKEGOOD_MODEL: z.string().default("claude-opus-5-5"),
-  /** Google Gemini, used for evidence work when no Anthropic key is set. */
+  /** Google Gemini, used for evidence work. Without a key, pattern rules read notices and the other AI steps say they are off. */
   GEMINI_API_KEY: z.string().optional(),
   GEMINI_MODEL: z.string().default("gemini-flash-latest"),
   /** "file" writes emails to DATA_DIR/outbox for local work. "resend" sends them. */
@@ -62,8 +60,6 @@ export type Config = {
   allowSimulator: boolean;
   allowLivePayPal: boolean;
   paypalPartner: { clientId: string; clientSecret: string } | null;
-  anthropicApiKey: string | null;
-  model: string;
   gemini: { apiKey: string; model: string } | null;
   email: { transport: "file" | "resend"; resendApiKey: string | null; from: string };
   fxApiUrl: string;
@@ -120,8 +116,6 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env, options: { r
     allowSimulator: env.ALLOW_SIMULATOR ?? !production,
     allowLivePayPal: env.ALLOW_LIVE_PAYPAL === LIVE_PAYPAL_PHRASE,
     paypalPartner: partner,
-    anthropicApiKey: env.ANTHROPIC_API_KEY ?? null,
-    model: env.MAKEGOOD_MODEL,
     gemini: env.GEMINI_API_KEY ? { apiKey: env.GEMINI_API_KEY, model: env.GEMINI_MODEL } : null,
     email: { transport: env.EMAIL_TRANSPORT, resendApiKey: env.RESEND_API_KEY ?? null, from: env.EMAIL_FROM },
     fxApiUrl: env.FX_API_URL.replace(/\/$/, ""),

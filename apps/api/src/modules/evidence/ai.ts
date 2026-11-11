@@ -1,13 +1,13 @@
-// The models used for evidence work: Claude here, Gemini in gemini.ts.
-// Both send the same words (`prompts`) and return the same checked shapes.
+// What the evidence AI is asked, and the shapes it must answer in. The model
+// is Google Gemini (gemini.ts).
 //
-// Claude is used for three evidence tasks, each with a structured output:
+// The AI is used for three evidence tasks, each with a structured output:
 //   1. reading a supplier notice into fields with exact quotes;
 //   2. giving an opinion on whether a product code written on an order means
 //      a product in the catalogue;
 //   3. explaining, from the evidence already stored, why a record is held.
 //
-// Claude has no tool here. It cannot read the database, change a record,
+// The AI has no tool here. It cannot read the database, change a record,
 // confirm a customer, approve a batch or call PayPal. Its output is text in a
 // fixed shape, which ordinary code then checks (extract.ts, service.ts). What
 // survives the check is shown to a person as a proposal.
@@ -15,8 +15,6 @@
 // Documents and order text are written by other people. They are passed as
 // data, and the instructions say so.
 
-import Anthropic from "@anthropic-ai/sdk";
-import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod";
 import { RawExtraction } from "./extract.ts";
 
@@ -55,7 +53,7 @@ export type RecordForExplanation = {
 /** What the rest of the code needs from a model. Tests supply their own. */
 export interface EvidenceAi {
   /** Which company's model this is. Stored with everything it reads. */
-  readonly provider: "claude" | "gemini";
+  readonly provider: "gemini";
   readonly model: string;
   readNotice(input: { document: string; catalogue: Array<{ sku: string; title: string | null }> }): Promise<RawExtraction | null>;
   judgeAliases(input: { catalogue: Array<{ sku: string; title: string | null }>; candidates: AliasCandidate[] }): Promise<AliasOpinions | null>;
@@ -128,41 +126,3 @@ export const prompts = {
     return { system: EXPLAIN_RULES, user: `<record>${NL}${lines.join(NL)}${NL}</record>` };
   },
 };
-
-export class ClaudeEvidenceAi implements EvidenceAi {
-  readonly provider = "claude" as const;
-  readonly model: string;
-  readonly #client: Anthropic;
-
-  constructor(options: { apiKey: string; model: string }) {
-    this.model = options.model;
-    this.#client = new Anthropic({ apiKey: options.apiKey });
-  }
-
-  async #ask<T>(system: string, user: string, schema: z.ZodType<T>, maxTokens: number): Promise<T | null> {
-    const response = await this.#client.messages.parse({
-      model: this.model,
-      max_tokens: maxTokens,
-      system,
-      messages: [{ role: "user", content: user }],
-      output_config: { effort: "low", format: zodOutputFormat(schema) },
-    });
-    if (response.stop_reason === "refusal" || response.stop_reason === "max_tokens") return null;
-    return (response.parsed_output as T | null | undefined) ?? null;
-  }
-
-  readNotice(input: { document: string; catalogue: Array<{ sku: string; title: string | null }> }) {
-    const p = prompts.notice(input);
-    return this.#ask(p.system, p.user, RawExtraction, 6000);
-  }
-
-  judgeAliases(input: { catalogue: Array<{ sku: string; title: string | null }>; candidates: AliasCandidate[] }) {
-    const p = prompts.aliases(input);
-    return this.#ask(p.system, p.user, AliasOpinions, 4000);
-  }
-
-  explainRecord(input: RecordForExplanation) {
-    const p = prompts.explain(input);
-    return this.#ask(p.system, p.user, RecordExplanation, 3000);
-  }
-}

@@ -9,7 +9,7 @@ import { openDb, type Db } from "./platform/db/db.ts";
 import { migrate } from "./platform/db/migrate.ts";
 import { JobRunner, type Job, type JobHandler } from "./platform/jobs/queue.ts";
 import { runDetectors } from "./modules/detection/service.ts";
-import { ClaudeEvidenceAi, type EvidenceAi } from "./modules/evidence/ai.ts";
+import type { EvidenceAi } from "./modules/evidence/ai.ts";
 import { GeminiEvidenceAi } from "./modules/evidence/gemini.ts";
 import { OperationExecutor } from "./modules/execution/executor.ts";
 import { FxService } from "./modules/fx/service.ts";
@@ -24,7 +24,7 @@ export type Container = {
   db: Db;
   clock: Clock;
   deps: { db: Db; clock: Clock };
-  /** Claude, for reading evidence. Null when no API key is set: every AI step then says so and the rest works. */
+  /** Gemini, for reading evidence. Null when no API key is set: every AI step then says so and the rest works. */
   ai: EvidenceAi | null;
   identity: IdentityDeps;
   secrets: SecretBox;
@@ -50,7 +50,6 @@ export async function createContainer(config: Config, overrides: Overrides = {})
   const deps = { db, clock };
   const ai: EvidenceAi | null =
     overrides.ai !== undefined ? overrides.ai
-    : config.anthropicApiKey ? new ClaudeEvidenceAi({ apiKey: config.anthropicApiKey, model: config.model })
     : config.gemini ? new GeminiEvidenceAi({ ...config.gemini, fetchImpl: overrides.fetchImpl })
     : null;
   const connections = new PayPalConnections({ db, clock, secrets, config, fetchImpl: overrides.fetchImpl });

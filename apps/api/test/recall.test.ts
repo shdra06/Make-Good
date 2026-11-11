@@ -90,7 +90,7 @@ test("the recall case, from the supplier's notice to PayPal's confirmation", asy
   assert.equal(evidence.documents.length, 1);
   assert.equal(evidence.documents[0].data_label, "synthetic", "the notice is marked as invented");
   assert.equal(evidence.ai.configured, false);
-  assert.equal((await h.post(`${h.inc}/documents/${h.seeded.documentId}/extract`, { method: "claude" })).status, 503, "no key, so no AI, and it says so");
+  assert.equal((await h.post(`${h.inc}/documents/${h.seeded.documentId}/extract`, { method: "ai" })).status, 503, "no key, so no AI, and it says so");
 
   const read = await h.ok(h.post(`${h.inc}/documents/${h.seeded.documentId}/extract`, { method: "auto" }));
   assert.equal(read.method, "pattern_rules", "with no key, the stored reading says pattern rules did it");
@@ -327,12 +327,12 @@ test("a field survives only if it quotes the document and its value is inside th
   assert.equal(invented.proposedCompensation, null, "an unquoted remedy proposes nothing");
 });
 
-test("Claude's output is checked like any other reader's, and it can decide nothing", async () => {
+test("the AI's output is checked like any other reader's, and it can decide nothing", async () => {
   const notice = recallNotice(new Date("2026-11-11T09:00:00Z")).body;
   const calls: string[] = [];
   // Stands in for the model. It answers the way a careless or manipulated model might.
   const model: EvidenceAi = {
-    provider: "claude",
+    provider: "gemini",
     model: "stand-in-model",
     readNotice: async () => {
       calls.push("readNotice");
@@ -377,7 +377,7 @@ test("Claude's output is checked like any other reader's, and it can decide noth
   const h = await harness(model);
 
   const read = await h.ok(h.post(`${h.inc}/documents/${h.seeded.documentId}/extract`, { method: "auto" }));
-  assert.deepEqual([read.method, read.model], ["claude", "stand-in-model"]);
+  assert.deepEqual([read.method, read.model], ["gemini", "stand-in-model"]);
   assert.deepEqual(read.output.dropped.map((d: any) => d.value), ["B-2224"], "the batch the model made a sentence up for is dropped");
   assert.deepEqual(read.output.proposedScope, SCOPE);
   assert.ok(notice.includes(read.output.batchCodes[0].quote));

@@ -1,7 +1,7 @@
-// Google Gemini for the same three evidence jobs as Claude (see ai.ts).
+// Google Gemini for the three evidence jobs (prompts and shapes in ai.ts).
 //
 // Plain HTTPS to the Gemini API, with JSON output held to a schema. The
-// answer is then parsed with the same Zod schema as Claude's and goes through
+// answer is then parsed with the Zod schema and goes through
 // the same checks in extract.ts and service.ts. Gemini has no tools here and
 // decides nothing.
 

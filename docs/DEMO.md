@@ -40,7 +40,7 @@ The same case also runs on PayPal's real sandbox from the command line (`npm run
 ## What to say if asked
 
 - **Is that real PayPal?** The page runs on a simulator, and says so on every screen. The same case was run on PayPal's sandbox with real test payments and real refunds: `docs/VERIFICATION.md` section 2a lists PayPal's refund IDs. Nothing has run on live PayPal, and the code refuses to unless a deliberate setting is made.
-- **Is the AI real?** Yes: with `GEMINI_API_KEY` set, Google Gemini reads the notice, gives opinions on look-alike codes and explains held records. It was checked against the real Gemini API (`npm run ai:verify`). Every line it reads must quote the notice, and it never decides who is paid. Without a key, plain text rules read the notice instead. Claude is also built in, but has not been run against the real API (no key).
+- **Is the AI real?** Yes: with `GEMINI_API_KEY` set, Google Gemini reads the notice, gives opinions on look-alike codes and explains held records. It was checked against the real Gemini API (`npm run ai:verify`). Every line it reads must quote the notice, and it never decides who is paid. Without a key, plain text rules read the notice instead.
 - **Are the accuracy figures real?** They are counts from this run on invented records whose right answers we fixed in advance. They are not measurements of any merchant.
 - **Are customers emailed?** Yes, but the emails are saved as files in `apps/api/.data/outbox`, not sent over the internet. A customer is told they were paid only after PayPal confirmed it, and only once.
 - **Have merchants asked for this?** We have not interviewed any. `docs/STRATEGY.md` separates what we verified from what we assume.

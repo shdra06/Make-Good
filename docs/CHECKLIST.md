@@ -48,8 +48,8 @@ An independent product review (10 Nov 2026) and the brief that followed it asked
 | No duplicate payment across incidents | Verified | A purchase paid under another incident is held for a named person; a payment being refunded by another batch waits. `test/manifest.test.ts` |
 | A failed refund is never silently turned into a payout; payouts need their own approval | Verified | Payouts go in a batch of their own. `test/manifest.test.ts` "a refund PayPal refuses stays failed" |
 | A timeout is never a failure | Verified earlier, unchanged | `test/execution.test.ts`; on the sandbox, see Stage 2 |
-| **Review: make AI prove its usefulness.** Evidence tasks, each conclusion citing its source, structured outputs, checked by code, confirmed by a person | Built. **Not verified against Claude: no API key on this machine.** | Reading a notice, an opinion on product-code aliases, explaining a held record. Each has a structured output and a check that drops anything not grounded in the source. Tested with a stand-in model in `test/recall.test.ts`. The pattern-rule reader (no AI) is verified |
-| AI never decides eligibility, approves or moves money | Verified | Claude is called from one file and has no tool. Tests show its output changes no record |
+| **Review: make AI prove its usefulness.** Evidence tasks, each conclusion citing its source, structured outputs, checked by code, confirmed by a person | Built, and **verified against real Gemini** (see the AI row below) | Reading a notice, an opinion on product-code aliases, explaining a held record. Each has a structured output and a check that drops anything not grounded in the source. Tested with a stand-in model in `test/recall.test.ts`. The pattern-rule reader (no AI) is verified |
+| AI never decides eligibility, approves or moves money | Verified | Gemini is called from one file and has no tool. Tests show its output changes no record |
 | **Review: 10 to 15 deliberately messy cases with known answers** | Verified | 32 synthetic orders, 29 with a stored right answer. `src/modules/demo/recall-scenario.ts` |
 | At least one uncertain case held, not paid | Verified | Five are held on the simulator; one of them is in truth not affected |
 | Real sandbox refunds, full and partial, with read-back | **Verified on the sandbox** | 16 refunds, each `COMPLETED` at PayPal for the listed amount; 14 payments fully refunded, 2 partially. `docs/VERIFICATION.md` section 2a |
@@ -216,7 +216,7 @@ The page is `apps/web/public` (plain HTML, CSS and JavaScript, no build step), s
 
 1. **Transaction Search permission.** In the PayPal developer dashboard, open the app and tick Transaction Search under its features. PayPal currently answers `403 NOT_AUTHORIZED`. Without it, payments are fetched one by one from the IDs that orders carry, which works, but duplicate-charge detection and history have nothing to read on a real account.
 2. **A store to connect.** A WooCommerce test site or a Shopify development store, for a real connector.
-3. **A Claude key.** Put `ANTHROPIC_API_KEY` in `apps/api/.env`. Until then every AI step says it is not configured, the notice is read by pattern rules, and the Claude calls stay unverified.
+3. **The Gemini key.** It is in `apps/api/.env` and works. Make a new one (it was pasted in a chat) and replace it there. Without a key every AI step says it is off and the notice is read by pattern rules.
 3a. **Three to five people who run a shop**, for the five interview questions in `docs/STRATEGY.md`. Nothing in this repository shows that a merchant wants this.
 4. **A public address and a registered webhook**, to check webhook signatures against PayPal.
 5. **PayPal partner approval.** Only matters for a hosted product serving other merchants. Not needed for the hackathon.

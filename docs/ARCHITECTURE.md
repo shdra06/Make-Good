@@ -91,7 +91,7 @@ All under `apps/api/src/modules`, plus cross-cutting code in `src/platform`.
 | `reporting` | Read queries for the screens | Built and tested through the API |
 | `demo` | Sample data on the simulator, and the HM-300 recall case with known answers (simulator or sandbox) | Built and tested |
 | `recovery` | The Recovery Map, policy pricing, look-alike product codes | Built and tested |
-| `evidence` | Incident documents, reading them into checked fields, product-code aliases, explanations. Claude is called only from `evidence/ai.ts` | Built. Pattern-rule reader tested. Claude calls tested with a stand-in model only: no API key on this machine |
+| `evidence` | Incident documents, reading them into checked fields, product-code aliases, explanations. Gemini is called only from `evidence/gemini.ts`; the prompts are in `evidence/ai.ts` | Built. Pattern-rule reader tested. Gemini verified against the real API (`npm run ai:verify`) |
 | `evaluation` | Accuracy against known answers for synthetic data | Built and tested |
 | claims, notifications | | Tables only. Not built. |
 | `platform` | Database, migrations, money, crypto, audit, jobs, clock, config, errors | Built and tested |
@@ -254,7 +254,7 @@ This design does not make the product compliant with any law or standard. Compli
 5. **Categories with grounds, not confidence scores.** A number would claim precision we do not have.
 6. **Two answers, never merged.** Payment identity and eligibility are stored separately; the next step is a fixed table of the two. A record becomes payable without a person only when the payment is verified and the unit is proven. The batch approval remains the human control.
 6a. **An approval is of an exact list.** The manifest is immutable; approvals are bound to its hash; any change underneath withdraws it; the worker re-checks before every call.
-6b. **AI reads, people decide.** Claude has no tool. Its output is a proposal in a fixed shape, checked by ordinary code against the source, and nothing it says changes a record until a named person acts.
+6b. **AI reads, people decide.** The model (Gemini) has no tool. Its output is a proposal in a fixed shape, checked by ordinary code against the source, and nothing it says changes a record until a named person acts.
 7. **Reconcile by repeating the request with the same key**, except when the batch was cancelled or the request is over six hours old; then wait for PayPal's records and tell a person.
 8. **One payout per operation**, not one PayPal batch for many. Simpler to reason about and to reconcile. Group them later if volume needs it.
 9. **Refunds are never converted between currencies.** FX is for reporting and forecasting only.

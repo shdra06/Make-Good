@@ -382,7 +382,7 @@ export function buildApp(c: Container): Router {
     },
   });
   route({
-    method: "POST", path: "/api/orgs/:orgId/candidates/:candidateId/explain", summary: "Claude explains, from the stored evidence only, why this record is held (needs an API key)", tag: "Evidence",
+    method: "POST", path: "/api/orgs/:orgId/candidates/:candidateId/explain", summary: "Gemini explains, from the stored evidence only, why this record is held (needs an API key)", tag: "Evidence",
     auth: { permission: "org.read" }, params: OrgParams.extend({ candidateId: uuid }),
     handler: async ({ params, org }) => explainCandidate({ ...c.deps, ai: c.ai }, { orgId: org.orgId, candidateId: params.candidateId }),
   });
@@ -463,7 +463,7 @@ export function buildApp(c: Container): Router {
   route({
     method: "POST", path: "/api/orgs/:orgId/incidents/:incidentId/documents/:documentId/extract", summary: "Read products, batches, dates and remedy out of a document. Every field quotes the document. Nothing is applied.", tag: "Evidence",
     auth: { permission: "incident.write" }, params: Incident.extend({ documentId: uuid }),
-    body: z.object({ method: z.enum(["auto", "pattern_rules", "claude", "ai"]).default("auto") }),
+    body: z.object({ method: z.enum(["auto", "pattern_rules", "ai"]).default("auto") }),
     handler: async ({ body, params, org, user }) =>
       extractDocument({ ...c.deps, ai: c.ai }, { orgId: org.orgId, incidentId: params.incidentId, documentId: params.documentId, userId: user.id, method: body.method }),
   });

@@ -2,7 +2,7 @@
 // them, product-code aliases, and explanations of held records.
 //
 // The pattern in every function is the same:
-//   a reader (pattern rules or Claude) proposes  ─▶  code checks the proposal
+//   a reader (pattern rules or Gemini) proposes  ─▶  code checks the proposal
 //   against the source  ─▶  a person accepts, changes or rejects it.
 // Nothing a reader produces changes who is matched or paid until the person's
 // step, and that step is recorded in their name.
@@ -74,20 +74,20 @@ const catalogueOf = (deps: Deps, orgId: string) =>
 
 /**
  * Reads a document into checked fields and stores the result as a proposal.
- * "auto" uses Claude when a key is set and the pattern rules otherwise; the
+ * "auto" uses Gemini when a key is set and the pattern rules otherwise; the
  * stored row always says which one ran.
  */
 export async function extractDocument(
   deps: Deps,
-  input: { orgId: string; incidentId: string; documentId: string; userId: string; method: "auto" | "pattern_rules" | "claude" | "ai" },
-): Promise<{ id: string; method: "claude" | "gemini" | "pattern_rules"; model: string | null; output: Extraction }> {
+  input: { orgId: string; incidentId: string; documentId: string; userId: string; method: "auto" | "pattern_rules" | "ai" },
+): Promise<{ id: string; method: "gemini" | "pattern_rules"; model: string | null; output: Extraction }> {
   const [document] = await deps.db.query<{ body: string; title: string }>(
     "select body, title from incident_documents where org_id = $1 and incident_id = $2 and id = $3",
     [input.orgId, input.incidentId, input.documentId],
   );
   if (!document) throw new NotFoundError("Document");
-  if ((input.method === "claude" || input.method === "ai") && !deps.ai) throw new NotConfiguredError("AI_NOT_CONFIGURED", AI_MISSING);
-  const method: "claude" | "gemini" | "pattern_rules" = input.method === "pattern_rules" || !deps.ai ? "pattern_rules" : deps.ai.provider;
+  if (input.method === "ai" && !deps.ai) throw new NotConfiguredError("AI_NOT_CONFIGURED", AI_MISSING);
+  const method: "gemini" | "pattern_rules" = input.method === "pattern_rules" || !deps.ai ? "pattern_rules" : deps.ai.provider;
   const catalogue = await catalogueOf(deps, input.orgId);
   const skus = catalogue.map((c) => c.sku);
 
@@ -151,7 +151,7 @@ export async function acceptExtraction(
   }
   const saved = await addRuleVersion(deps, {
     orgId: input.orgId, incidentId: input.incidentId, userId: input.userId, scope: input.scope, compensation: input.compensation,
-    note: input.note ?? `Read from "${row.title}" by ${row.method === "pattern_rules" ? "pattern rules" : row.method === "gemini" ? "Gemini" : "Claude"}, checked and saved by a member of staff.`,
+    note: input.note ?? `Read from "${row.title}" by ${row.method === "pattern_rules" ? "pattern rules" : row.method === "gemini" ? "Gemini" : row.method}, checked and saved by a member of staff.`,
   });
   const now = deps.clock.now();
   await deps.db.tx(async (tx) => {
@@ -184,7 +184,7 @@ export type AliasView = {
 
 /**
  * Finds order lines that look like the products in scope but are not matched,
- * stores each as a suggestion, and (when a key is set) adds Claude's opinion.
+ * stores each as a suggestion, and (when a key is set) adds Gemini's opinion.
  * A suggestion changes nothing. Only `decideAlias` does.
  */
 export async function suggestAliases(deps: Deps, input: { orgId: string; incidentId: string; withAi?: boolean }): Promise<{ aliases: AliasView[]; aiUsed: boolean; aiNote: string | null }> {
@@ -301,7 +301,7 @@ export async function decideAlias(
 const maskEmails = (s: string): string => s.replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, "[email]");
 
 /**
- * Asks Claude to explain, from the evidence already stored, why a record is
+ * Asks Gemini to explain, from the evidence already stored, why a record is
  * waiting for a person. Points that cite nothing, or cite an id that does not
  * exist, are dropped. Customer names and emails are not sent.
  */

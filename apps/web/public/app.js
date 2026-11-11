@@ -299,7 +299,7 @@ const findCustomers = () => run(async () => {
   await refresh();
 });
 
-const askClaudeAboutAliases = () => run(async () => {
+const askAiAboutAliases = () => run(async () => {
   state.aliases = await post(`${incUrl()}/aliases/suggest`, { withAi: true });
   if (state.aliases.aiNote) toast(state.aliases.aiNote, true);
 });
@@ -574,7 +574,7 @@ function s1() {
         evidence.ai.configured && h("button", { class: "btn", onclick: () => readNotice("pattern_rules") }, "Read it with pattern rules")),
       !evidence.ai.configured && h("p", { class: "note" }, "No AI key is set on this server, so the notice is read with plain text rules against your catalogue. The check on the result is the same either way.")));
   } else {
-    const by = extraction.method === "pattern_rules" ? "Read by pattern rules, no AI" : `Read by ${extraction.method === "gemini" ? "Gemini" : "Claude"} (${extraction.model})`;
+    const by = extraction.method === "pattern_rules" ? "Read by pattern rules, no AI" : `Read by ${extraction.method === "gemini" ? "Gemini" : extraction.method} (${extraction.model})`;
     right.push(h("div", { class: "card pad" },
       h("h3", {}, "What the notice says"),
       h("p", { class: "sub" }, `${by}. Each line was checked: it quotes the notice word for word, and its value is inside the quote.`),
@@ -693,7 +693,7 @@ function aliasPanel() {
         h("td", { class: "nowrap" }, x.status === "suggested"
           ? [h("button", { class: "btn small", onclick: () => decideAlias(x, "confirm") }, "Same product"), " ", h("button", { class: "btn small", onclick: () => decideAlias(x, "reject") }, "Different")]
           : chip(x.status === "confirmed" ? `same product: ${x.decidedBy || "confirmed"}` : `different: ${x.decidedBy || "rejected"}`, x.status === "confirmed" ? "ok" : ""))))))),
-    state.evidence.ai.configured && open.length > 0 && h("div", { class: "actions" }, h("button", { class: "btn small", onclick: askClaudeAboutAliases }, "Ask the AI for an opinion on these")));
+    state.evidence.ai.configured && open.length > 0 && h("div", { class: "actions" }, h("button", { class: "btn small", onclick: askAiAboutAliases }, "Ask the AI for an opinion on these")));
 }
 
 // ----- 3. the evidence: the Recovery Map -----
