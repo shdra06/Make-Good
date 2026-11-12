@@ -115,7 +115,7 @@ function purchaseUnit(invoiceId: string, cents: number, quantity: number) {
     invoice_id: invoiceId,
     description: "Make Good sandbox verification",
     amount: { currency_code: "USD", value, breakdown: { item_total: { currency_code: "USD", value } } },
-    items: [{ name: "Hand mixer HM-300", sku: "HM-300", quantity: String(quantity), unit_amount: { currency_code: "USD", value: fromMinor(cents, "USD") } }],
+    items: [{ name: "Mug set CM-412", sku: "CM-412", quantity: String(quantity), unit_amount: { currency_code: "USD", value: fromMinor(cents, "USD") } }],
   };
 }
 
@@ -285,7 +285,7 @@ async function main(): Promise<number> {
       externalId: seed.invoiceId, orderNumber: seed.invoiceId, placedAt: new Date().toISOString(), currency: "USD",
       customer: { email: `buyer-${seed.invoiceId.toLowerCase()}@example.com`, name: "Test Buyer" },
       paymentMethod: "paypal", paymentReference: seed.captureId, total,
-      lines: [{ externalId: "1", sku: "HM-300", title: "Hand mixer HM-300", quantity: seed.quantity, unitPrice: fromMinor(seed.cents, "USD") }],
+      lines: [{ externalId: "1", sku: "CM-412", title: "Mug set CM-412", quantity: seed.quantity, unitPrice: fromMinor(seed.cents, "USD") }],
       fulfilments: [{ externalId: "1", shippedAt: new Date().toISOString(), lines: [{ lineExternalId: "1", quantity: seed.quantity, batchCode: "LOT-24B" }] }],
     })));
   }
@@ -293,10 +293,10 @@ async function main(): Promise<number> {
   const looked = await lookupPaymentsByReference(c.deps, { orgId: org.id, connectionId: conn.id, provider });
   say("fetch the 3 payments from PayPal by ID and link them to orders", looked.found === 3, `found ${looked.found} of ${looked.looked}${looked.notFound.length ? `, not found: ${looked.notFound.join(", ")}` : ""}`);
 
-  const incident = await createIncident(c.deps, { orgId: org.id, userId: user.id, kind: "recall", title: "HM-300 batch LOT-24B overheats", description: "Sandbox verification" });
+  const incident = await createIncident(c.deps, { orgId: org.id, userId: user.id, kind: "recall", title: "CM-412 batch LOT-24B fails a lead test", description: "Sandbox verification" });
   await addRuleVersion(c.deps, {
     orgId: org.id, incidentId: incident.id, userId: user.id,
-    scope: { type: "product", skus: ["HM-300"], batchCodes: ["LOT-24B"], serials: [], orderedFrom: null, orderedTo: null, shippedFrom: null, shippedTo: null, warehouses: [] },
+    scope: { type: "product", skus: ["CM-412"], batchCodes: ["LOT-24B"], serials: [], orderedFrom: null, orderedTo: null, shippedFrom: null, shippedTo: null, warehouses: [] },
     // Half of each payment, so that "refunded twice" would be visible as a fully refunded payment.
     compensation: { type: "percent", percentBps: 5000, includeTax: true, includeShipping: false, minMinor: null, maxMinor: null, rounding: "half_up", allowPayout: false, refundWindowDays: 180 },
   });

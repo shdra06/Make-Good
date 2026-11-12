@@ -21,7 +21,7 @@ Run from `apps/api`. Result of the last run (11 Nov, after the product review ch
 | `test/compensation.test.ts` | 17 | Seven rule types, tax and discount and shipping, limits, earlier refunds, currencies, the 180-day rule, 200 random orders that must add back up |
 | `test/execution.test.ts` | 17 | The money path end to end with injected faults: lost replies, 5xx, a stopped worker, duplicate jobs, rate limits, low balance, disputes, pending refunds, approvals, cancellation, payouts, and fetching a payment by its ID |
 | `test/manifest.test.ts` | 11 | What an approval covers: the manifest cannot be edited; a new customer, a rule change or a changed balance withdraws the approval; the worker withholds a payment its approval no longer covers; only listed operations are released; a refused refund is never turned into a payout; no double payment across incidents; one refund per payment per batch; reconciling a payment; a person's confirmation as evidence |
-| `test/recall.test.ts` | 3 | The HM-300 recall case end to end through the API on the simulator, with every count checked against the known answers; the check that drops unquoted or invented fields; and a stand-in model whose invented output is dropped and changes nothing |
+| `test/recall.test.ts` | 3 | The CM-412 recall case end to end through the API on the simulator, with every count checked against the known answers; the check that drops unquoted or invented fields; and a stand-in model whose invented output is dropped and changes nothing |
 | `test/api.test.ts` | 11 | Sign-in, rate limit, tenant isolation on every organisation route, roles, cross-site requests, a recall through the API, monitoring, currency exposure, secret handling, webhooks, the API description |
 
 The database in these tests is PGlite: PostgreSQL itself, compiled to run in-process, in memory. The SQL and the migrations are the same ones production would use.
@@ -117,7 +117,7 @@ After the check, the script refunded the rest of each payment so that the remain
 
 What this run does not show: the orders were created through the import format, not pulled from a real store; the payments were card payments, not PayPal-wallet payments; and nothing here used Transaction Search.
 
-## 2a. The HM-300 recall case on the PayPal sandbox (11 Nov 2026)
+## 2a. The CM-412 recall case on the PayPal sandbox (11 Nov 2026)
 
 ```bash
 npm run sandbox:recall
@@ -132,7 +132,7 @@ One run, 07:40 to 07:47 UTC, all 47 checks passed. The payments, refunds, lookup
 | Two payments with one invoice number | **PayPal refused the second: `DUPLICATE_INVOICE_ID`.** It was taken without an invoice number, so both orders pointed at the one payment that carried the number. Both were held as ambiguous. |
 | Read each payment by ID | 26 of 26 found. Transaction Search was not used (this app does not have it). |
 | The payment ID the store recorded wrongly | PayPal does not know it. The order is held: payment not found. |
-| Read the supplier notice | By pattern rules (this run had no AI key). Products HM-300 and HM-300-EU, batch B-2217. A person saved the rules. |
+| Read the supplier notice | By pattern rules (this run had no AI key). Products CM-412 and CM-412-GB, batch K-0719. A person saved the rules. |
 | Dispute check before matching | 19 payments asked about, 0 in dispute |
 | Match | 12 ready after two product-code aliases were confirmed by a person; 5 held for evidence of the unit; 3 held for the payment; 4 shown not to be affected |
 | Against the known answers | 18 of 21 affected units proven from records; 0 wrongly called proven; 5 held (3 truly affected, 2 not); 0 missed. 21 payments verified and right, 0 tied to the wrong order. 12 of 12 calculated amounts exact. |
@@ -151,7 +151,7 @@ PayPal IDs from this run, which can be looked up in the sandbox dashboard:
 
 | Case | Payment (capture) | Our refund | Amount | Payment status after |
 |---|---|---|---|---|
-| Multi-item order: only the mixer's share | `76P113675M1184632` | `9XW34277GH0989512` | 53.10 | `PARTIALLY_REFUNDED` |
+| Multi-item order: only the mug set's share | `76P113675M1184632` | `9XW34277GH0989512` | 53.10 | `PARTIALLY_REFUNDED` |
 | Two units, one from the recalled batch (also the lost reply) | `0UV99253465369136` | `6VC86280HM550293P` | 59.00 | `PARTIALLY_REFUNDED` |
 | 20.00 already given back before the incident | `7TG2677804011084S` | `50C05286ES305710C` | 39.00 | `REFUNDED` |
 | Two units, both recalled | `6LT57801WH289873J` | `34W085724U2731835` | 118.00 | `REFUNDED` |

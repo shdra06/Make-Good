@@ -9,11 +9,11 @@ test("a customer sends a claim with a photo; staff review it and ask for more; t
   await page.getByLabel("Your name").fill("Rosa Diaz");
   await page.getByLabel("Work email").fill(`rosa-${unique()}@example.com`);
   await page.getByLabel("Password").fill("correct horse battery");
-  await page.getByLabel("Shop name").fill("Diaz Kitchen");
+  await page.getByLabel("Shop name").fill("Diaz Ceramics");
   await page.getByRole("button", { name: "Create account" }).click();
   await expect(page).toHaveURL(/\/dashboard$/);
   await page.goto("/incidents/new");
-  await page.getByLabel("Title", { exact: true }).fill("KX-9 kettle: lid may come loose");
+  await page.getByLabel("Title", { exact: true }).fill("KX-9 teapot: lid may come loose");
   await page.getByRole("button", { name: "Open the incident" }).click();
   await expect(page).toHaveURL(/\/notice$/);
   await page.getByRole("link", { name: "Claims" }).click();
@@ -25,11 +25,11 @@ test("a customer sends a claim with a photo; staff review it and ask for more; t
   // A customer, in another browser, with no account.
   const customer = await (await browser.newContext()).newPage();
   await customer.goto(path);
-  await expect(customer.getByText("Diaz Kitchen")).toBeVisible();
+  await expect(customer.getByText("Diaz Ceramics")).toBeVisible();
   await customer.getByLabel("Your name").fill("Maya Chen");
   await customer.getByLabel("Your email").fill("maya@example.com");
   await customer.getByLabel("Batch code").fill("K-77");
-  await customer.getByLabel("What happened").fill("I bought the KX-9 kettle in October; the lid came loose twice.");
+  await customer.getByLabel("What happened").fill("I bought the KX-9 teapot in October; the lid came loose twice.");
   await customer.locator("#files").setInputFiles({ name: "label.png", mimeType: "image/png", buffer: PNG });
   await customer.getByRole("button", { name: "Send the claim" }).click();
   await expect(customer).toHaveURL(/\/claim\/status\//);

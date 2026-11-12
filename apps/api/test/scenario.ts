@@ -25,7 +25,7 @@ export async function scenario(options: { dualControl?: boolean } = {}) {
   const paypal = new SimulatedPayPal({ now: () => clock.now() });
 
   const [org] = await db.query<{ id: string }>(
-    "insert into organisations (name, slug, settings) values ('Kitchen Co', 'kitchen-co', $1::jsonb) returning id",
+    "insert into organisations (name, slug, settings) values ('Emberline Ceramics', 'emberline-ceramics', $1::jsonb) returning id",
     [JSON.stringify({ approval: { dualControl: options.dualControl ?? false } })],
   );
   const orgId = org!.id;
@@ -37,8 +37,8 @@ export async function scenario(options: { dualControl?: boolean } = {}) {
     await db.query("insert into memberships (org_id, user_id, role) values ($1, $2, $3)", [orgId, u!.id, role]);
     return u!.id;
   };
-  const operator = await user("olive@kitchen.test", "operator");
-  const approver = await user("ada@kitchen.test", "finance_approver");
+  const operator = await user("olive@emberline.test", "operator");
+  const approver = await user("ada@emberline.test", "finance_approver");
   const [conn] = await db.query<{ id: string }>(
     "insert into paypal_connections (org_id, environment, mode, status) values ($1, 'simulator', 'simulator', 'connected') returning id",
     [orgId],
@@ -73,18 +73,18 @@ export async function scenario(options: { dualControl?: boolean } = {}) {
     const total = unitMinor * quantity;
     const placedAt = input.placedAt ?? "2026-09-08T10:00:00.000Z";
     const email = input.email ?? `customer${n}@example.com`;
-    const sku = input.sku ?? "HM-300";
+    const sku = input.sku ?? "CM-412";
     const capture = input.payWithPayPal === false ? null : paypal.addCapture({
       amountMinor: total, currency, createdAt: new Date(placedAt), payerEmail: email, payerName: `Customer ${n}`,
       payerId: `SIMPAYER${n}`, payerCountry: "US", invoiceId: `#${n}`,
-      items: [{ code: sku, name: "Hand mixer", quantity, unitMinor }],
+      items: [{ code: sku, name: "Mug set", quantity, unitMinor }],
     });
     const order = OrderImport.parse({
       externalId: `ext-${n}`, orderNumber: `#${n}`, placedAt, currency,
       customer: { email, name: `Customer ${n}` },
       paymentMethod: capture ? "paypal" : "card", paymentReference: capture?.id ?? null,
       total: fromMinor(total, currency),
-      lines: [{ externalId: "l1", sku, title: "Hand mixer HM-300", quantity, unitPrice: fromMinor(unitMinor, currency) }],
+      lines: [{ externalId: "l1", sku, title: "Mug set CM-412", quantity, unitPrice: fromMinor(unitMinor, currency) }],
       fulfilments: input.shippedAt === null ? [] : [{
         externalId: "f1", shippedAt: input.shippedAt ?? "2026-09-10T10:00:00.000Z",
         lines: [{ lineExternalId: "l1", quantity, batchCode: input.batchCode === undefined ? "LOT-24B" : input.batchCode }],
@@ -96,17 +96,17 @@ export async function scenario(options: { dualControl?: boolean } = {}) {
   }
 
   const stock = (batch: Partial<BatchImport> & { batchCode: string }) =>
-    db.tx((tx) => upsertBatch(tx, orgId, { sku: "HM-300", warehouse: "default", quantity: null, receivedAt: null, firstShippedAt: null, lastShippedAt: null, ...batch }));
+    db.tx((tx) => upsertBatch(tx, orgId, { sku: "CM-412", warehouse: "default", quantity: null, receivedAt: null, firstShippedAt: null, lastShippedAt: null, ...batch }));
 
   /** Copies PayPal's transactions into our tables and links them to orders. */
   const sync = () =>
     syncTransactions(deps, { orgId, connectionId: conn!.id, provider: paypal, from: new Date("2026-03-01T00:00:00Z"), to: clock.now() });
 
   async function incident(input: { scope?: Record<string, unknown>; compensation?: Record<string, unknown>; kind?: string } = {}) {
-    const { id } = await createIncident(deps, { orgId, userId: operator, kind: (input.kind ?? "recall") as "recall", title: "HM-300 batch LOT-24B overheats", description: "" });
+    const { id } = await createIncident(deps, { orgId, userId: operator, kind: (input.kind ?? "recall") as "recall", title: "CM-412 batch LOT-24B fails a lead test", description: "" });
     await addRuleVersion(deps, {
       orgId, incidentId: id, userId: operator,
-      scope: (input.scope ?? { type: "product", skus: ["HM-300"], batchCodes: ["LOT-24B"] }) as never,
+      scope: (input.scope ?? { type: "product", skus: ["CM-412"], batchCodes: ["LOT-24B"] }) as never,
       compensation: (input.compensation ?? { type: "full_refund" }) as never,
     });
     return id;

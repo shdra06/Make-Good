@@ -7,7 +7,7 @@ import { adjustment, at, batch, fulfilment, line, order, paidOrder, payment } fr
 const NOW = at("2026-10-01");
 
 function recall(extra: Record<string, unknown> = {}) {
-  return IncidentScope.parse({ type: "product", skus: ["HM-300"], batchCodes: ["LOT-24B"], ...extra });
+  return IncidentScope.parse({ type: "product", skus: ["CM-412"], batchCodes: ["LOT-24B"], ...extra });
 }
 
 function match(input: Partial<MatchInput> & { scope: MatchInput["scope"] }) {
@@ -38,7 +38,7 @@ test("a different recorded batch clears the customer, and is counted", () => {
 
 test("a similar product with a different SKU is never matched", () => {
   const { order: o, payment: p } = paidOrder({
-    lines: [line({ sku: "HM-300-RED", fulfilments: [fulfilment({ quantity: 1, batchCode: "LOT-24B" })] }), line({ sku: "HM-30" })],
+    lines: [line({ sku: "CM-412-RED", fulfilments: [fulfilment({ quantity: 1, batchCode: "LOT-24B" })] }), line({ sku: "CM-41" })],
   });
   assert.equal(match({ scope: recall(), orders: [o], payments: [p] }).candidates.length, 0);
 });
@@ -197,7 +197,7 @@ test("the same customer buying twice gives two separate candidates", () => {
 });
 
 test("serial numbers recorded at packing identify exact units", () => {
-  const scope = IncidentScope.parse({ type: "product", skus: ["HM-300"], serials: ["SN-0042", "SN-0043"] });
+  const scope = IncidentScope.parse({ type: "product", skus: ["CM-412"], serials: ["SN-0042", "SN-0043"] });
   const { order: o, payment: p } = paidOrder({ lines: [line({ quantity: 2, fulfilments: [fulfilment({ quantity: 2, serials: ["sn0042", "SN-0099"] })] })] });
   const { candidates, stats } = match({ scope, orders: [o], payments: [p] });
   assert.equal(candidates.length, 1);
@@ -219,7 +219,7 @@ test("a whole-product incident (no batch) is exact from the order line alone", (
 
 test("a PayPal payment with no store order is a weak, transaction-only candidate", () => {
   const known = paidOrder({ lines: [line({ fulfilments: [fulfilment({ quantity: 1, batchCode: "LOT-24B" })] })] });
-  const named = payment({ payerEmail: "a@example.com", items: [{ code: "hm-300", name: "Hand mixer", quantity: 1, unitMinor: 5900 }] });
+  const named = payment({ payerEmail: "a@example.com", items: [{ code: "cm-412", name: "Mug set", quantity: 1, unitMinor: 5900 }] });
   const amountOnly = payment({ payerEmail: "b@example.com", grossMinor: 5900 });
   const unrelated = payment({ payerEmail: "c@example.com", grossMinor: 1234 });
   const cs = match({ scope: recall(), orders: [known.order], payments: [known.payment, named, amountOnly, unrelated] }).candidates;
@@ -279,7 +279,7 @@ test("three identical charges give two duplicates", () => {
 // ---------- overcharge and service period ----------
 
 test("an overcharge is the difference per unit, on the units not returned", () => {
-  const scope = IncidentScope.parse({ type: "overcharge", sku: "HM-300", correctUnitPriceMinor: 4900, from: "2026-09-01T00:00:00Z", to: "2026-09-30T00:00:00Z" });
+  const scope = IncidentScope.parse({ type: "overcharge", sku: "CM-412", correctUnitPriceMinor: 4900, from: "2026-09-01T00:00:00Z", to: "2026-09-30T00:00:00Z" });
   const over = paidOrder({ lines: [line({ quantity: 2, unitPriceMinor: 5900 })] });
   const right = paidOrder({ lines: [line({ unitPriceMinor: 4900 })] });
   const cs = match({ scope, orders: [over.order, right.order], payments: [over.payment, right.payment] }).candidates;

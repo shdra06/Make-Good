@@ -33,9 +33,9 @@ export function adjustment(input: Partial<AdjustmentRecord> & { kind: Adjustment
 export function line(input: Partial<OrderLineRecord> = {}): OrderLineRecord {
   return {
     id: id("line"),
-    sku: "HM-300",
+    sku: "CM-412",
     variantId: null,
-    title: "Hand mixer HM-300",
+    title: "Mug set CM-412",
     kind: "physical",
     quantity: 1,
     unitPriceMinor: 5900,
@@ -114,8 +114,8 @@ export function paidOrder(
 export function batch(input: Partial<InventoryBatchRecord> & { batchCode: string }): InventoryBatchRecord {
   return {
     id: id("bat"),
-    variantId: "var-hm300",
-    sku: "HM-300",
+    variantId: "var-cm412",
+    sku: "CM-412",
     warehouse: "default",
     receivedAt: null,
     firstShippedAt: null,

@@ -280,7 +280,7 @@ export async function loadMatchData(
     orderIds = [...new Set(linked.map((l) => l.order_id))];
   } else {
     const skus = (scope.type === "overcharge" ? [scope.sku] : scope.skus).map(normSku);
-    // Only product incidents use aliases: a recall of HM-300 should reach an order line written "HM300".
+    // Only product incidents use aliases: a recall of CM-412 should reach an order line written "CM412".
     if (scope.type === "product") aliases = await confirmedAliases(q, orgId, skus);
     const codes = [...new Set([...skus, ...aliases.filter((a) => a.kind === "sku").map((a) => normSku(a.alias))])];
     const titles = [...new Set(aliases.filter((a) => a.kind === "title").map((a) => normTitle(a.alias)))];

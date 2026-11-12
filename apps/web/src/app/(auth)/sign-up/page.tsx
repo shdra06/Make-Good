@@ -42,7 +42,7 @@ export default function SignUpPage() {
           <Field label="Your name" name="name" autoComplete="name" required maxLength={120} />
           <Field label="Work email" name="email" type="email" autoComplete="email" required />
           <Field label="Password" name="password" type="password" autoComplete="new-password" required minLength={10} hint="At least 10 characters." />
-          <Field label="Shop name" name="shop" required minLength={2} maxLength={120} placeholder="Kitchen Co" />
+          <Field label="Shop name" name="shop" required minLength={2} maxLength={120} placeholder="Emberline Ceramics" />
           {signUp.error ? <Alert>{signUp.error.message}</Alert> : null}
           <Button type="submit" disabled={signUp.isPending}>
             {signUp.isPending ? <Loader2 className="animate-spin" /> : null}

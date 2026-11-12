@@ -76,7 +76,12 @@ function ConfirmForm({ candidateId, onDone }: { candidateId: string; onDone: () 
         </div>
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="note">Note</Label>
-          <Textarea id="note" value={note} onChange={(e) => setNote(e.target.value)} placeholder="For example: customer sent a photo of the label, B-2217" />
+          <Textarea
+            id="note"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="For example: customer sent a photo of the mug's base, K-0719"
+          />
         </div>
         <div className="flex flex-wrap gap-2">
           <Button onClick={() => void decide("confirm")} disabled={pending}>

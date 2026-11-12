@@ -27,7 +27,7 @@ npm run sandbox
 npm run sandbox:recall
 ```
 
-`npm test` runs the automated tests against a real PostgreSQL engine running in-process (PGlite). `npm run smoke` drives a running server over HTTP. Neither touches PayPal: they use the built-in simulator. `npm run sandbox` and `npm run sandbox:recall` are the ones that talk to PayPal's real sandbox, using the keys in `make-good/.env`. The second runs the whole HM-300 recall case there.
+`npm test` runs the automated tests against a real PostgreSQL engine running in-process (PGlite). `npm run smoke` drives a running server over HTTP. Neither touches PayPal: they use the built-in simulator. `npm run sandbox` and `npm run sandbox:recall` are the ones that talk to PayPal's real sandbox, using the keys in `make-good/.env`. The second runs the whole CM-412 recall case there.
 
 ## Stage 0. The product review, mapped to what was done
 
@@ -168,7 +168,7 @@ An independent product review (10 Nov 2026) and the brief that followed it asked
 | Customer claim portal, evidence upload, review, appeal | **Not built** | |
 | Supplier notice stored with the incident and read into fields; each field must quote the notice and contain its value, or it is dropped | Verified with the pattern-rule reader | `test/recall.test.ts` |
 | Rules are saved only by a person, and cannot contain a code the notice never mentions | Verified | `test/recall.test.ts` |
-| AI evidence steps (reading a notice, an opinion on product-code aliases, explaining a held record). Structured outputs, checked by code, no tools | **Verified against real Gemini** (`gemini-flash-latest`, 11 Nov 2026) with `npm run ai:verify`: the notice read correctly with nothing dropped; HM-3000 judged a different product; the title-only order judged the same product; "HM300" (title "Hand Mixer 300W") answered "cannot tell"; the explanation cited only real evidence; nothing changed any record. **Claude not verified**: no Anthropic key. | `scripts/ai-verify.ts`, `.data/ai-verification.json`; stand-in model tests in `test/recall.test.ts` |
+| AI evidence steps (reading a notice, an opinion on product-code aliases, explaining a held record). Structured outputs, checked by code, no tools | **Verified against real Gemini** (`gemini-flash-latest`, 11 Nov 2026) with `npm run ai:verify`: the notice read correctly with nothing dropped; CM-4120 judged a different product; the title-only order judged the same product; "CM412" (title "Mug Set 412") answered "cannot tell"; the explanation cited only real evidence; nothing changed any record. **Claude not verified**: no Anthropic key. | `scripts/ai-verify.ts`, `.data/ai-verification.json`; stand-in model tests in `test/recall.test.ts` |
 | AI reading of receipts and labels sent by customers | **Not built** | Belongs with the claims portal |
 | Email notices | **Not built** | Table exists; no transport code |
 

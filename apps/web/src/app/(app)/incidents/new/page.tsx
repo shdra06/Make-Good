@@ -74,14 +74,14 @@ export default function NewIncidentPage() {
               </p>
             ) : null}
           </div>
-          <Field label="Title" name="title" required minLength={3} maxLength={200} placeholder="HM-300 hand mixer: batch B-2217 recalled" />
+          <Field label="Title" name="title" required minLength={3} maxLength={200} placeholder="CM-412 mug set: batch K-0719 recalled" />
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="description">What you know so far</Label>
             <Textarea id="description" name="description" maxLength={5000} placeholder="Optional. Who told you, and what they said." />
           </div>
           <fieldset className="flex flex-col gap-4 rounded-lg border p-4">
             <legend className="px-1 text-sm font-medium">The supplier&apos;s notice (optional)</legend>
-            <Field label="Notice title" name="noticeTitle" maxLength={200} placeholder="Safety recall notice KA-RN-2026-031" />
+            <Field label="Notice title" name="noticeTitle" maxLength={200} placeholder="Safety recall notice WP-RN-2026-031" />
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="noticeBody">Notice text</Label>
               <Textarea

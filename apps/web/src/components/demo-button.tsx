@@ -10,7 +10,7 @@ import { api } from "@/lib/api";
 
 /**
  * Creates a throw-away demo workspace: a demo user, a shop on the built-in
- * PayPal simulator, and the synthetic HM-300 recall case. No real money.
+ * PayPal simulator, and the synthetic CM-412 recall case. No real money.
  */
 export function DemoButton({ size = "lg" }: { size?: "lg" | "default" }) {
   const router = useRouter();
@@ -19,7 +19,7 @@ export function DemoButton({ size = "lg" }: { size?: "lg" | "default" }) {
     mutationFn: async () => {
       const id = Math.random().toString(36).slice(2, 10);
       await api.post("/api/auth/register", { email: `demo-${id}@example.com`, password: `${crypto.randomUUID()}-Demo`, name: "Ada (demo)" });
-      const org = await api.post<{ id: string }>("/api/orgs", { name: `Kitchen Co ${id}` });
+      const org = await api.post<{ id: string }>("/api/orgs", { name: `Emberline Ceramics ${id}` });
       await api.post(`/api/orgs/${org.id}/paypal/simulator`);
       const seeded = await api.post<{ incidentId: string }>(`/api/orgs/${org.id}/demo/recall-scenario`);
       return seeded.incidentId;

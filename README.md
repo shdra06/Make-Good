@@ -99,7 +99,7 @@ npm run demo
 2. Check the rules and press **Confirm rules and find affected customers**.
 3. On **Customers**, see the precision levels. Press **Create a batch**.
 4. On **Payments**, press **Approve this batch**, then **Send the money**.
-5. Open a customer's confirm page from the **Customers** tab and type `B-2217`.
+5. Open a customer's confirm page from the **Customers** tab and type `K-0719`.
 6. Open the public claim page from the **Claims** tab and file a claim. Decide it as the reviewer.
 7. See **Report** for what PayPal confirmed and who did what.
 8. Back on the start page, press **Scan the last 120 days** to find double charges.

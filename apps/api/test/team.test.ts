@@ -24,7 +24,7 @@ test("an invitation by email: works once, only for that address, and can be with
   const base = { orgId: s.orgId, actorId: s.approver, publicUrl: "http://app.test" };
 
   await assert.rejects(invite(deps, mailer, { ...base, actorRole: "admin", email: "x@example.com", role: "owner" }), /Only an owner/);
-  await assert.rejects(invite(deps, mailer, { ...base, actorRole: "owner", email: "OLIVE@kitchen.test", role: "viewer" }), /already in the team/);
+  await assert.rejects(invite(deps, mailer, { ...base, actorRole: "owner", email: "OLIVE@emberline.test", role: "viewer" }), /already in the team/);
 
   const out = await invite(deps, mailer, { ...base, actorRole: "admin", email: "Nia@Example.com", role: "reviewer" });
   assert.equal(out.sent, true);
@@ -32,7 +32,7 @@ test("an invitation by email: works once, only for that address, and can be with
   const token = tokenIn(sent.at(-1)!);
   assert.equal((await s.db.query("select 1 from invitations where token_hash = $1", [token])).length, 0, "only the hash is stored");
   const seen = await describeInvitation(deps, token);
-  assert.deepEqual([seen.organisation, seen.role, seen.email, seen.accountExists], ["Kitchen Co", "reviewer", "nia@example.com", false]);
+  assert.deepEqual([seen.organisation, seen.role, seen.email, seen.accountExists], ["Emberline Ceramics", "reviewer", "nia@example.com", false]);
 
   const stranger = await registerUser(deps, { email: "someone@example.com", password: "correct horse battery", name: "Someone" });
   await assert.rejects(acceptInvitation(deps, { token, userId: stranger.id }), /is for nia@example.com/, "a forwarded link is no use to anyone else");
@@ -70,7 +70,7 @@ test("a payment list waiting for approval emails the people who may approve it, 
   const { sent, mailer } = memoryMailer();
   const deps = { db: s.db, clock: s.clock, mailer, publicUrl: "http://app.test" };
   await sendAlert(deps, jobs[0]!);
-  assert.deepEqual(sent.map((e) => e.to), ["ada@kitchen.test"], "the finance approver, not the operator who built it");
+  assert.deepEqual(sent.map((e) => e.to), ["ada@emberline.test"], "the finance approver, not the operator who built it");
   assert.match(sent[0]!.subject, /waits for your approval: Refunds/);
   assert.match(sent[0]!.text, new RegExp(`http://app.test/incidents/${incidentId}/approval`));
   await sendAlert(deps, jobs[0]!);

@@ -81,7 +81,7 @@ ${DATA_RULE}
 
 Rules
 1. Use only the order-line titles and batch codes given for the candidate, and the catalogue.
-2. "same_product" needs a positive reason in the titles, such as the same model name and product type. A code that only starts with the same characters is not a reason: HM-3000 is not HM-300.
+2. "same_product" needs a positive reason in the titles, such as the same model name and product type. A code that only starts with the same characters is not a reason: CM-4120 is not CM-412.
 3. If the titles describe a different type of product, or a different model, answer "different_product".
 4. If the titles do not settle it, answer "cannot_tell". That is a good answer.
 5. quotedTitle must be one of the given titles, copied exactly.
@@ -107,7 +107,7 @@ export const prompts = {
     return { system: NOTICE_RULES, user: `<catalogue>${NL}${catalogue}${NL}</catalogue>${NL}${NL}<document>${NL}${input.document.slice(0, 40_000)}${NL}</document>` };
   },
   aliases(input: { catalogue: Array<{ sku: string; title: string | null }>; candidates: AliasCandidate[] }) {
-    // The store import creates a catalogue entry for any code it meets, so a look-alike such as "HM300" would appear
+    // The store import creates a catalogue entry for any code it meets, so a look-alike such as "CM412" would appear
     // as its own product and answer the question for the model. Those entries are left out.
     const asked = new Set(input.candidates.map((c) => c.alias.trim().toUpperCase()));
     const catalogue = input.catalogue.filter((c) => !asked.has(c.sku.trim().toUpperCase())).slice(0, 500).map((c) => `${c.sku} | ${c.title ?? ""}`).join(NL);

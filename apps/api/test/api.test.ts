@@ -86,7 +86,7 @@ async function harness() {
 }
 
 const RECALL_RULES = {
-  scope: { type: "product", skus: ["HM-300"], batchCodes: ["LOT-24B"] },
+  scope: { type: "product", skus: ["CM-412"], batchCodes: ["LOT-24B"] },
   compensation: { type: "full_refund" },
 };
 
@@ -96,7 +96,7 @@ test("accounts: register, sign in, sign out, and wrong passwords", async () => {
   assert.equal((await anon.get("/api/me")).status, 401);
   assert.equal((await anon.post("/api/auth/register", { email: "x@example.com", password: "short", name: "X" })).status, 422);
 
-  const ada = await h.person("Ada", "Kitchen Co");
+  const ada = await h.person("Ada", "Emberline Ceramics");
   const me = await ada.get("/api/me");
   assert.equal(me.body.user.email, "ada@example.com");
   assert.equal(me.body.organisations[0].role, "owner");
@@ -130,11 +130,11 @@ test("sign-in is rate limited", async () => {
 
 test("tenant isolation: no organisation route answers for someone else's organisation", async () => {
   const h = await harness();
-  const ada = await h.person("Ada", "Kitchen Co");
+  const ada = await h.person("Ada", "Emberline Ceramics");
   const mallory = await h.person("Mallory", "Other Shop");
   await ada.post(`/api/orgs/${ada.orgId}/paypal/simulator`);
   await ada.post(`/api/orgs/${ada.orgId}/demo/seed`);
-  const incident = await ada.post(`/api/orgs/${ada.orgId}/incidents`, { kind: "recall", title: "HM-300 recall" });
+  const incident = await ada.post(`/api/orgs/${ada.orgId}/incidents`, { kind: "recall", title: "CM-412 recall" });
 
   const spec = h.openapi() as { paths: Record<string, Record<string, unknown>> };
   const filler = "00000000-0000-4000-8000-000000000000";
@@ -161,7 +161,7 @@ test("tenant isolation: no organisation route answers for someone else's organis
 
 test("roles: each person can do their job and no more", async () => {
   const h = await harness();
-  const owner = await h.person("Olga", "Kitchen Co");
+  const owner = await h.person("Olga", "Emberline Ceramics");
   const org = owner.orgId;
   const viewer = await h.person("Vik");
   const operator = await h.person("Omar");
@@ -180,7 +180,7 @@ test("roles: each person can do their job and no more", async () => {
   assert.equal((await viewer.get(`/api/orgs/${org}/audit`)).status, 403);
   assert.equal((await operator.post(`/api/orgs/${org}/paypal/simulator`)).status, 403);
 
-  const incident = await operator.post(`/api/orgs/${org}/incidents`, { kind: "recall", title: "HM-300 recall" });
+  const incident = await operator.post(`/api/orgs/${org}/incidents`, { kind: "recall", title: "CM-412 recall" });
   assert.equal(incident.status, 200);
   await operator.post(`/api/orgs/${org}/incidents/${incident.body.id}/rules`, RECALL_RULES);
   await operator.post(`/api/orgs/${org}/incidents/${incident.body.id}/match`);
@@ -195,7 +195,7 @@ test("roles: each person can do their job and no more", async () => {
 
 test("a request from another website is refused", async () => {
   const h = await harness();
-  const ada = await h.person("Ada", "Kitchen Co");
+  const ada = await h.person("Ada", "Emberline Ceramics");
   const res = await ada.post(`/api/orgs/${ada.orgId}/paypal/simulator`, {}, { origin: "https://evil.example" });
   assert.equal(res.status, 403);
   const ok = await ada.post(`/api/orgs/${ada.orgId}/paypal/simulator`, {}, { origin: "http://localhost:4000" });
@@ -204,7 +204,7 @@ test("a request from another website is refused", async () => {
 
 test("a request that changes something must carry the anti-forgery header", async () => {
   const h = await harness();
-  const ada = await h.person("Ada", "Kitchen Co");
+  const ada = await h.person("Ada", "Emberline Ceramics");
   const url = `/api/orgs/${ada.orgId}/paypal/simulator`;
   const missing = await ada.call("POST", url, {}, { "x-make-good": "" });
   assert.equal(missing.status, 403);
@@ -221,7 +221,7 @@ const linkToken = (email: Email, path: string) => email.text.split(`/${path}/`)[
 
 test("email verification: a link is sent on sign-up and works once", async () => {
   const h = await harness();
-  const ada = await h.person("Ada", "Kitchen Co");
+  const ada = await h.person("Ada", "Emberline Ceramics");
   assert.equal((await ada.get("/api/me")).body.user.emailVerified, false);
   const sent = h.outbox.filter((e) => e.to === "ada@example.com" && e.subject.includes("Confirm your email"));
   assert.equal(sent.length, 1);
@@ -247,7 +247,7 @@ test("email verification: a resent link expires and the resend is limited", asyn
 
 test("password reset: same reply for unknown emails, one-time link, every session signed out", async () => {
   const h = await harness();
-  const ada = await h.person("Ada", "Kitchen Co");
+  const ada = await h.person("Ada", "Emberline Ceramics");
   const anon = h.client();
   const before = h.outbox.length;
   const unknown = await anon.post("/api/auth/password-reset", { email: "nobody@example.com" });
@@ -275,7 +275,7 @@ test("password reset: same reply for unknown emails, one-time link, every sessio
 
 test("a recall, start to finish, through the API", async () => {
   const h = await harness();
-  const ada = await h.person("Ada", "Kitchen Co");
+  const ada = await h.person("Ada", "Emberline Ceramics");
   const org = ada.orgId;
 
   const conn = await ada.post(`/api/orgs/${org}/paypal/simulator`);
@@ -285,13 +285,13 @@ test("a recall, start to finish, through the API", async () => {
   assert.equal((await ada.post(`/api/orgs/${org}/demo/seed`)).status, 409, "sample data is loaded once");
   assert.equal((await ada.get(`/api/orgs/${org}`)).body.settings.demoData, true, "the organisation is marked as holding sample data");
 
-  const orders = await ada.get(`/api/orgs/${org}/orders?search=HM-300&size=5`);
+  const orders = await ada.get(`/api/orgs/${org}/orders?search=CM-412&size=5`);
   assert.ok(orders.body.total > 40);
   assert.equal(orders.body.rows.length, 5);
   const payments = await ada.get(`/api/orgs/${org}/payments?kind=payment&size=3`);
   assert.ok(payments.body.rows.every((p: any) => p.transaction_id.startsWith("SIM") && p.environment === "simulator"), "sample payments are marked as simulated");
 
-  const incident = await ada.post(`/api/orgs/${org}/incidents`, { kind: "recall", title: "HM-300 batch LOT-24B overheats" });
+  const incident = await ada.post(`/api/orgs/${org}/incidents`, { kind: "recall", title: "CM-412 batch LOT-24B fails a lead test" });
   const id = incident.body.id;
   assert.equal((await ada.post(`/api/orgs/${org}/incidents/${id}/match`)).status, 422, "matching needs rules first");
   assert.equal((await ada.post(`/api/orgs/${org}/incidents/${id}/rules`, { scope: { type: "product", skus: [] }, compensation: { type: "full_refund" } })).status, 422);
@@ -365,7 +365,7 @@ test("a recall, start to finish, through the API", async () => {
 
 test("monitoring finds the double charges, and one click turns them into a refund batch", async () => {
   const h = await harness();
-  const ada = await h.person("Ada", "Kitchen Co");
+  const ada = await h.person("Ada", "Emberline Ceramics");
   const org = ada.orgId;
   await ada.post(`/api/orgs/${org}/paypal/simulator`);
   await ada.post(`/api/orgs/${org}/demo/seed`);
@@ -391,11 +391,11 @@ test("monitoring finds the double charges, and one click turns them into a refun
 
 test("currency exposure is reported with indicative rates and clear warnings", async () => {
   const h = await harness();
-  const ada = await h.person("Ada", "Kitchen Co");
+  const ada = await h.person("Ada", "Emberline Ceramics");
   const org = ada.orgId;
   await ada.post(`/api/orgs/${org}/paypal/simulator`);
   await ada.post(`/api/orgs/${org}/demo/seed`);
-  const incident = await ada.post(`/api/orgs/${org}/incidents`, { kind: "recall", title: "HM-300 recall" });
+  const incident = await ada.post(`/api/orgs/${org}/incidents`, { kind: "recall", title: "CM-412 recall" });
   await ada.post(`/api/orgs/${org}/incidents/${incident.body.id}/rules`, RECALL_RULES);
   await ada.post(`/api/orgs/${org}/incidents/${incident.body.id}/match`);
 
@@ -423,7 +423,7 @@ test("currency exposure is reported with indicative rates and clear warnings", a
 
 test("PayPal credentials are encrypted at rest and never returned", async () => {
   const h = await harness();
-  const ada = await h.person("Ada", "Kitchen Co");
+  const ada = await h.person("Ada", "Emberline Ceramics");
   const secret = "ELtopsecretvalue1234567890abcdefghijklmnopqrstuvwxyz";
   const res = await ada.post(`/api/orgs/${ada.orgId}/paypal/credentials`, { environment: "sandbox", clientId: "AYclientidvalue1234567890abcdefghij", clientSecret: secret });
   assert.equal(res.status, 200, JSON.stringify(res.body));
@@ -451,7 +451,7 @@ test("PayPal credentials are encrypted at rest and never returned", async () => 
 
 test("webhooks: stored once, acted on only when PayPal confirms the signature", async () => {
   const h = await harness();
-  const ada = await h.person("Ada", "Kitchen Co");
+  const ada = await h.person("Ada", "Emberline Ceramics");
   const org = ada.orgId;
   const conn = await ada.post(`/api/orgs/${org}/paypal/simulator`);
   await ada.post(`/api/orgs/${org}/demo/seed`);
@@ -522,7 +522,7 @@ test("rate limits are kept in the database, so a second server process sees the 
 
 test("row-level security: inside one shop's request, the database itself hides and refuses other shops' rows", async () => {
   const h = await harness();
-  const ada = await h.person("Ada", "Kitchen Co");
+  const ada = await h.person("Ada", "Emberline Ceramics");
   const bo = await h.person("Bo", "Garden Ltd");
   for (const p of [ada, bo]) await p.post(`/api/orgs/${p.orgId}/incidents`, { kind: "recall", title: `Recall at ${p.email}` });
   assert.equal(await h.db.rowSecurity(), true, "the rules apply to this connection");
@@ -563,7 +563,7 @@ test("row-level security: inside one shop's request, the database itself hides a
 
 test("row-level security rules never cast an empty shop setting to a uuid", async () => {
   const h = await harness();
-  await h.person("Ada", "Kitchen Co");
+  await h.person("Ada", "Emberline Ceramics");
   // Real PostgreSQL may evaluate either side of an OR first, so every cast must go through nullif.
   const policies = await h.db.query<{ tablename: string; qual: string }>("select tablename, qual from pg_policies where policyname = 'org_isolation'");
   assert.ok(policies.length > 20);

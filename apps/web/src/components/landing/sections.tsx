@@ -124,19 +124,19 @@ const Pill = ({ tone, children }: { tone: "ok" | "hold" | "info"; children: Reac
 );
 
 const MATCHES: [string, string, string, "ok" | "hold" | "info"][] = [
-  ["Maya Chen", "HM-300 · B-2217", "Payment and unit match", "ok"],
-  ["Omar Haddad", "HM-300 · B-2217", "Payment and unit match", "ok"],
-  ["J. Okafor", "HM-300 · ?", "Batch not on the packing slip", "hold"],
-  ["Lucía Ramos", "HM-300 · B-2217", "Payment and unit match", "ok"],
-  ["Dev Patel", "HM-300 · B-2217", "Paid by a different email", "hold"],
-  ["Ana Silva", "HM-300 · B-2217", "Payment and unit match", "ok"],
-  ["Tom Becker", "HM-300 · B-2231", "Different batch", "info"],
+  ["Maya Chen", "CM-412 · K-0719", "Payment and unit match", "ok"],
+  ["Omar Haddad", "CM-412 · K-0719", "Payment and unit match", "ok"],
+  ["J. Okafor", "CM-412 · ?", "Batch not on the packing slip", "hold"],
+  ["Lucía Ramos", "CM-412 · K-0719", "Payment and unit match", "ok"],
+  ["Dev Patel", "CM-412 · K-0719", "Paid by a different email", "hold"],
+  ["Ana Silva", "CM-412 · K-0719", "Payment and unit match", "ok"],
+  ["Tom Becker", "CM-412 · K-0733", "Different batch", "info"],
 ];
 
 function MatchScreen() {
   return (
-    <Window title="Customers · HM-300 recall">
-      <p className="mb-3 font-medium">Who received batch B-2217?</p>
+    <Window title="Customers · CM-412 recall">
+      <p className="mb-3 font-medium">Who received batch K-0719?</p>
       <div className="flex flex-col divide-y rounded-lg border">
         {MATCHES.map(([name, item, why, tone]) => (
           <div key={name} className="flex items-center gap-3 px-3 py-2">
@@ -224,7 +224,7 @@ const STEPS = [
     icon: FileSearch,
     title: "Read the supplier's notice",
     text: "The recall notice becomes rules a person checks: which products, which batches, which dates. Each rule quotes the line it came from.",
-    detail: "“Affected production batch: B-2217 only.”",
+    detail: "“Affected production batch: K-0719 only.”",
   },
   {
     icon: ListChecks,

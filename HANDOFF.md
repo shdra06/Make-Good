@@ -4,7 +4,7 @@ Read this first. It is the shortest path to working on the project. Update the "
 
 ## What it is
 
-A PayPal hackathon project. When a supplier recalls one batch of a product, Make Good works out who is owed money, why, how much, and what was actually paid. Flagship story: batch B-2217 of the HM-300 hand mixer.
+A PayPal hackathon project. When a supplier recalls one batch of a product, Make Good works out who is owed money, why, how much, and what was actually paid. Flagship story: batch K-0719 of the CM-412 mug set.
 
 ## Where things are
 

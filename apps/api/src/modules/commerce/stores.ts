@@ -32,7 +32,7 @@ export const ShopifyCredentials = z.object({
     .trim()
     .toLowerCase()
     .transform((s) => s.replace(/^https?:\/\//, "").replace(/\/.*$/, ""))
-    .refine((s) => /^[a-z0-9][a-z0-9-]*\.myshopify\.com$/.test(s), "Use the store's myshopify.com address, such as kitchen-co.myshopify.com."),
+    .refine((s) => /^[a-z0-9][a-z0-9-]*\.myshopify\.com$/.test(s), "Use the store's myshopify.com address, such as emberline-ceramics.myshopify.com."),
   accessToken: z.string().trim().min(10).max(200),
 });
 

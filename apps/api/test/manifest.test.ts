@@ -15,7 +15,7 @@ import { answerConfirm, confirmQuestion, createConfirmLink } from "../src/module
 import { addRuleVersion, decideCandidates, reconcilePayment } from "../src/modules/incidents/service.ts";
 import { scenario, type Scenario } from "./scenario.ts";
 
-const scope = { type: "product", skus: ["HM-300"], batchCodes: ["LOT-24B"] } as const;
+const scope = { type: "product", skus: ["CM-412"], batchCodes: ["LOT-24B"] } as const;
 
 async function submitAndApprove(s: Scenario, batchId: string) {
   await submitBatch(s.deps, { orgId: s.orgId, batchId, userId: s.operator });
@@ -314,8 +314,8 @@ test("two affected lines paid by one PayPal payment are refunded one batch at a 
     extra: {
       total: "118.00",
       lines: [
-        { externalId: "l1", sku: "HM-300", title: "Hand mixer HM-300", quantity: 1, unitPrice: "59.00" },
-        { externalId: "l2", sku: "HM-300", title: "Hand mixer HM-300 (gift)", quantity: 1, unitPrice: "59.00" },
+        { externalId: "l1", sku: "CM-412", title: "Mug set CM-412", quantity: 1, unitPrice: "59.00" },
+        { externalId: "l2", sku: "CM-412", title: "Mug set CM-412 (gift)", quantity: 1, unitPrice: "59.00" },
       ],
       fulfilments: [{
         externalId: "f1", shippedAt: "2026-09-10T10:00:00.000Z",
@@ -346,7 +346,7 @@ test("confirming a record cannot settle which payment paid for it; reconciling t
   const a = await s.sell({ extra: { paymentReference: null } as never });
   const twin = s.paypal.addCapture({
     amountMinor: 5900, currency: "USD", createdAt: new Date("2026-09-08T10:03:00.000Z"), payerEmail: a.email, payerId: "SIMPAYERTWIN",
-    invoiceId: a.orderNumber, items: [{ code: "HM-300", name: "Hand mixer", quantity: 1, unitMinor: 5900 }],
+    invoiceId: a.orderNumber, items: [{ code: "CM-412", name: "Mug set", quantity: 1, unitMinor: 5900 }],
   });
   await s.sync();
   const incidentId = await s.incident();
@@ -395,14 +395,14 @@ test("a person's confirmation is stored in their name, survives a new match and 
 
   await decideCandidates(s.deps, {
     orgId: s.orgId, incidentId, userId: s.operator, candidateIds: [candidate!.id], decision: "confirm",
-    basis: "customer_confirmed_unit", note: "customer sent a photo of the label: LOT-24B",
+    basis: "customer_confirmed_unit", note: "customer sent a photo of the mug's base: LOT-24B",
   });
   await s.match(incidentId);
   const evidence = await s.db.query<{ source: string; kind: string; fact: string }>(
     "select source, kind, fact from match_evidence where candidate_id = $1 and source = 'customer_statement'", [candidate!.id],
   );
   assert.equal(evidence.length, 1, "kept across the new match, and not duplicated");
-  assert.match(evidence[0]!.fact, /olive confirmed this record .* photo of the label/);
+  assert.match(evidence[0]!.fact, /olive confirmed this record .* photo of the mug's base/);
 
   const { id: batchId } = await createBatch(s.deps, { orgId: s.orgId, incidentId, userId: s.operator, name: "B" });
   const item = (await currentManifest(s.db, s.orgId, batchId))!.content.items[0]!;
@@ -419,7 +419,7 @@ test("a customer's answer through a link is evidence for staff, and pays nobody 
   const [candidate] = await candidates(s, incidentId);
   const { token } = await createConfirmLink(s.deps, { orgId: s.orgId, candidateId: candidate!.id, userId: s.operator });
   const asked = await confirmQuestion(s.deps, token);
-  assert.deepEqual([asked.orderNumber, asked.product], [a.orderNumber, "Hand mixer HM-300"]);
+  assert.deepEqual([asked.orderNumber, asked.product], [a.orderNumber, "Mug set CM-412"]);
   assert.equal(JSON.stringify(asked).includes(a.email), false, "the page shows no email address");
 
   await answerConfirm(s.deps, { token, batchCode: " lot 24b " });

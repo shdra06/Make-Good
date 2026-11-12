@@ -12,7 +12,7 @@ const RecallScene = dynamic(() => import("./recall-scene"), { ssr: false, loadin
 
 const CAPTIONS: Record<Phase, { step: string; text: string }> = {
   0: { step: "32 orders", text: "Every order the shop shipped, from its own records." },
-  1: { step: "Find the batch", text: "A scan finds the 23 orders from recalled batch B-2217." },
+  1: { step: "Find the batch", text: "A scan finds the 23 orders from recalled batch K-0719." },
   2: { step: "Hold the unclear", text: "5 records do not agree. They wait for a person, not a guess." },
   3: { step: "Refund through PayPal", text: "20 proven refunds go through PayPal, each with a fixed request ID." },
   4: { step: "PayPal confirmed", text: "A customer turns green only when PayPal confirms. Paid twice: 0." },

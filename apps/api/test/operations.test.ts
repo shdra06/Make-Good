@@ -50,18 +50,18 @@ async function setup(env: Record<string, string> = {}, mailer: Mailer | null = n
 
 test("the workspace export holds this shop's records, readable, and no credentials or tokens", async () => {
   const s = await setup();
-  const ada = await s.owner("ada", "Kitchen Co");
+  const ada = await s.owner("ada", "Emberline Ceramics");
   const bo = await s.owner("bo", "Garden Ltd");
   for (const p of [ada, bo]) await p.call("POST", `/api/orgs/${p.org}/paypal/simulator`);
   const store = (await ada.call("POST", `/api/orgs/${ada.org}/stores`, { name: "Main shop" })).body.id;
   const order = { externalId: "1001", orderNumber: "1001", placedAt: "2026-10-01T10:00:00Z", currency: "USD", customer: { email: "maya@example.com", name: "Maya Chen" },
-    paymentMethod: "paypal", lines: [{ externalId: "1", sku: "HM-300", title: "Hand mixer", quantity: 1, unitPrice: "59.00" }], total: "59.00" };
+    paymentMethod: "paypal", lines: [{ externalId: "1", sku: "CM-412", title: "Mug set", quantity: 1, unitPrice: "59.00" }], total: "59.00" };
   const imported = await ada.call("POST", `/api/orgs/${ada.org}/stores/${store}/orders`, { orders: [order] });
   assert.equal(imported.status, 200, JSON.stringify(imported.body));
 
   const res = await ada.call("GET", `/api/orgs/${ada.org}/export`);
   assert.equal(res.status, 200);
-  assert.match(String(res.headers["content-disposition"]), /attachment; filename="make-good-kitchen-co-2026-11-12\.json"/);
+  assert.match(String(res.headers["content-disposition"]), /attachment; filename="make-good-emberline-ceramics-2026-11-12\.json"/);
   const text = JSON.stringify(res.body);
   assert.equal(res.body.tables.orders[0].customer_email, "maya@example.com", "customer data comes out readable");
   assert.equal(res.body.tables.orders[0].customer_name, "Maya Chen");
@@ -77,7 +77,7 @@ test("the workspace export holds this shop's records, readable, and no credentia
 
 test("errors are recorded for the workspace, shown to its owner, and posted to the webhook", async () => {
   const s = await setup({ ERROR_WEBHOOK_URL: "https://hooks.example/errors" });
-  const ada = await s.owner("ada", "Kitchen Co");
+  const ada = await s.owner("ada", "Emberline Ceramics");
   await s.db.query("alter table commerce_connections rename to commerce_connections_gone");
   const broken = await ada.call("GET", `/api/orgs/${ada.org}/stores`);
   await s.db.query("alter table commerce_connections_gone rename to commerce_connections");
@@ -103,7 +103,7 @@ test("errors are recorded for the workspace, shown to its owner, and posted to t
 
 test("a workspace can switch the AI off", async () => {
   const s = await setup();
-  const ada = await s.owner("ada", "Kitchen Co");
+  const ada = await s.owner("ada", "Emberline Ceramics");
   const off = await ada.call("PATCH", `/api/orgs/${ada.org}/settings`, { aiEnabled: false });
   assert.equal(off.status, 200);
   assert.equal(off.body.aiEnabled, false);
@@ -119,25 +119,25 @@ test("claims: a customer sends one with a photo, staff see the matching order an
   const sent: Email[] = [];
   const mailer: Mailer = { transport: "file", send: async (e) => (sent.push(e), { ref: `mem/${e.id}` }) };
   const s = await setup({}, mailer);
-  const ada = await s.owner("ada", "Kitchen Co");
+  const ada = await s.owner("ada", "Emberline Ceramics");
   const store = (await ada.call("POST", `/api/orgs/${ada.org}/stores`, { name: "Main shop" })).body.id;
   await ada.call("POST", `/api/orgs/${ada.org}/stores/${store}/orders`, {
     orders: [{ externalId: "1001", orderNumber: "1001", placedAt: "2026-10-01T10:00:00Z", currency: "USD", customer: { email: "maya@example.com", name: "Maya Chen" },
-      paymentMethod: "paypal", lines: [{ externalId: "1", sku: "HM-300", title: "Hand mixer", quantity: 1, unitPrice: "59.00" }], total: "59.00" }],
+      paymentMethod: "paypal", lines: [{ externalId: "1", sku: "CM-412", title: "Mug set", quantity: 1, unitPrice: "59.00" }], total: "59.00" }],
   });
-  const incident = (await ada.call("POST", `/api/orgs/${ada.org}/incidents`, { kind: "recall", title: "HM-300 recall" })).body.id;
+  const incident = (await ada.call("POST", `/api/orgs/${ada.org}/incidents`, { kind: "recall", title: "CM-412 recall" })).body.id;
 
-  const opened = await ada.call("POST", `/api/orgs/${ada.org}/incidents/${incident}/claims/open`, { open: true, instructions: "Send a photo of the label." });
+  const opened = await ada.call("POST", `/api/orgs/${ada.org}/incidents/${incident}/claims/open`, { open: true, instructions: "Send a photo of the mug's base." });
   assert.equal(opened.status, 200);
   const slug = opened.body.slug as string;
   assert.match(opened.body.url, new RegExp(`/claim/${slug}$`));
 
   const anon = (await s.owner("zz", "Other")).call; // any browser; the public routes need no account
   const form = await anon("GET", `/api/public/claims/form/${slug}`);
-  assert.deepEqual([form.body.shop, form.body.title, form.body.instructions], ["Kitchen Co", "HM-300 recall", "Send a photo of the label."]);
+  assert.deepEqual([form.body.shop, form.body.title, form.body.instructions], ["Emberline Ceramics", "CM-412 recall", "Send a photo of the mug's base."]);
   assert.equal((await anon("POST", `/api/public/claims/form/${slug}`, { name: "Maya", email: "maya@example.com", statement: "short" })).status, 422);
   const claim = await anon("POST", `/api/public/claims/form/${slug}`, {
-    name: "Maya Chen", email: "Maya@Example.com", orderNumber: "1001", batchCode: "B-2217", statement: "I bought the HM-300 mixer in October and it has batch B-2217.",
+    name: "Maya Chen", email: "Maya@Example.com", orderNumber: "1001", batchCode: "K-0719", statement: "I bought the CM-412 mug set in October and it has batch K-0719.",
   });
   assert.equal(claim.status, 200);
   const token = claim.body.token as string;

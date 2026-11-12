@@ -413,7 +413,7 @@ export async function findLookalikes(q: Queryable, orgId: string, skus: string[]
       found.set(key, entry);
     }
   }
-  // "HM300" differs from HM-300 only by a hyphen. It is then not also offered as a longer form of HM-300-EU.
+  // "CM412" differs from CM-412 only by a hyphen. It is then not also offered as a longer form of CM-412-GB.
   const closest = new Set([...found.values()].filter((f) => f.difference === "punctuation_or_case_only").map((f) => `${f.kind}|${f.alias}`));
   return [...found.values()]
     .filter((f) => f.difference !== "extra_characters" || !closest.has(`${f.kind}|${f.alias}`))

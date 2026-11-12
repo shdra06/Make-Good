@@ -33,8 +33,8 @@ test("a recall from notice to PayPal-confirmed refunds", async ({ page }) => {
   // Step 1: read the notice, save the rules
   await page.getByRole("button", { name: /^Read it/ }).click();
   const said = page.getByTestId("notice-reading");
-  await expect(said).toContainText("B-2217");
-  await expect(said).toContainText("HM-300-EU");
+  await expect(said).toContainText("K-0719");
+  await expect(said).toContainText("CM-412-GB");
   await page.getByRole("button", { name: "Save these rules" }).click();
   await expect(page.getByRole("heading", { name: /Rules in force, version 1/ })).toBeVisible();
 
@@ -59,7 +59,7 @@ test("a recall from notice to PayPal-confirmed refunds", async ({ page }) => {
       .first();
     if ((await row.count()) === 0) break;
     const alias = await row.getAttribute("data-alias");
-    await row.getByRole("button", { name: alias === "HM-3000" ? "Different" : "Same product" }).click();
+    await row.getByRole("button", { name: alias === "CM-4120" ? "Different" : "Same product" }).click();
     await expect(aliases.locator(`tr[data-alias="${alias}"]`).getByRole("button")).toHaveCount(0);
   }
   await expect(page.getByText("Every look-alike product code has been decided.")).toBeVisible();
@@ -69,7 +69,7 @@ test("a recall from notice to PayPal-confirmed refunds", async ({ page }) => {
   await record(page, "5019").click();
   const sheet = page.getByRole("dialog");
   await expect(sheet.getByTestId("record")).toContainText("points the other way");
-  await sheet.getByLabel("Note").fill("Customer sent a photo of the label, B-2217");
+  await sheet.getByLabel("Note").fill("Customer sent a photo of the mug's base, K-0719");
   await sheet.getByRole("button", { name: "Confirm this customer" }).click();
   await expect(page.getByText("Confirmed in your name.")).toBeVisible();
   await expect(sheet).toBeHidden();
@@ -86,7 +86,7 @@ test("a recall from notice to PayPal-confirmed refunds", async ({ page }) => {
   const incidentUrl = page.url().split("?")[0]!;
   await page.goto(link);
   await expect(page.getByRole("heading", { name: "One question about your order" })).toBeVisible();
-  await page.getByLabel("Batch code").fill("B-2224");
+  await page.getByLabel("Batch code").fill("K-0726");
   await page.getByRole("button", { name: "Send" }).click();
   await expect(page.getByRole("heading", { name: "Thank you" })).toBeVisible();
   await page.goto(link);

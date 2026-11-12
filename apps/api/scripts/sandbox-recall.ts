@@ -150,7 +150,7 @@ async function payByCard(keys: { clientId: string; clientSecret: string }, reque
 // ---------- the run ----------
 
 async function main(): Promise<number> {
-  console.log("Make Good: the HM-300 recall case on the PayPal sandbox\n");
+  console.log("Make Good: the CM-412 recall case on the PayPal sandbox\n");
   const keys = readKeys();
   if (!keys) {
     say("find PayPal sandbox keys", false, "set PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET in the repository's .env");
@@ -192,7 +192,7 @@ async function main(): Promise<number> {
   const c = await createContainer(config, { db, passwordCost: { N: 1024, r: 8, p: 1 }, ai: null });
   const user = await registerUser(c.identity, { email: `recall-${stamp.toLowerCase()}@example.com`, password: `recall ${stamp} password`, name: "Olive (test)" });
   const second = await registerUser(c.identity, { email: `approver-${stamp.toLowerCase()}@example.com`, password: `approver ${stamp} password`, name: "Ada (test)" });
-  const org = await createOrganisation(c.identity, { name: `Kitchen Co ${stamp}`, defaultCurrency: "USD", userId: user.id });
+  const org = await createOrganisation(c.identity, { name: `Emberline Ceramics ${stamp}`, defaultCurrency: "USD", userId: user.id });
   await db.query("insert into memberships (org_id, user_id, role) values ($1, $2, 'finance_approver')", [org.id, second.id]);
   await db.query(`update organisations set settings = settings || '{"approval": {"dualControl": true}}'::jsonb where id = $1`, [org.id]);
   const conn = await c.connections.connectFirstParty(org.id, user.id, { environment: "sandbox", clientId: keys.clientId, clientSecret: keys.clientSecret });
@@ -226,7 +226,7 @@ async function main(): Promise<number> {
   say("match", true, JSON.stringify(m.result.byDecision));
   const suggested = await suggestAliases(ev, { orgId: org.id, incidentId: loaded.incidentId, withAi: false });
   for (const a of suggested.aliases) {
-    const same = a.alias === "HM300" || a.kind === "title";
+    const same = a.alias === "CM412" || a.kind === "title";
     await decideAlias(ev, { orgId: org.id, aliasId: a.id, userId: user.id, decision: same ? "confirm" : "reject" });
     say(`product code "${a.alias}"`, true, same ? `a person confirmed it means ${a.canonicalSku}` : `a person said it is a different product (${a.reason})`);
   }
@@ -245,7 +245,7 @@ async function main(): Promise<number> {
 
   console.log("\n5. People settle what the records cannot");
   const supported = heldRows.filter((r) => r.eligibility === "supported");
-  const confirmed = await decideCandidates(c.deps, { orgId: org.id, incidentId: loaded.incidentId, userId: user.id, candidateIds: supported.map((r) => r.id), decision: "confirm", basis: "merchant_records_checked", note: "warehouse pick sheets for that week show B-2217 only" });
+  const confirmed = await decideCandidates(c.deps, { orgId: org.id, incidentId: loaded.incidentId, userId: user.id, candidateIds: supported.map((r) => r.id), decision: "confirm", basis: "merchant_records_checked", note: "warehouse pick sheets for that week show K-0719 only" });
   say("a person confirms the two orders the stock records support", confirmed.changed === supported.length, `${confirmed.changed} confirmed, with the reason stored in their name`);
   const ambiguous = heldRows.filter((r) => r.payment_identity === "ambiguous");
   const refusedConfirm = ambiguous.length === 0 ? null : await decideCandidates(c.deps, { orgId: org.id, incidentId: loaded.incidentId, userId: user.id, candidateIds: ambiguous.map((r) => r.id), decision: "confirm", basis: "merchant_records_checked" });
@@ -262,7 +262,7 @@ async function main(): Promise<number> {
   m = await match();
 
   console.log("\n6. What is approved: one exact list, and what happens when it changes");
-  const batch = await createBatch(c.deps, { orgId: org.id, incidentId: loaded.incidentId, userId: user.id, name: "HM-300 recall" });
+  const batch = await createBatch(c.deps, { orgId: org.id, incidentId: loaded.incidentId, userId: user.id, name: "CM-412 recall" });
   const v1 = (await currentManifest(db, org.id, batch.id))!;
   say("build the payment list", true, `version ${v1.version}: ${v1.content.items.length} refunds, ${fromMinor(v1.content.items.reduce((a, i) => a + i.amountMinor, 0), "USD")} USD; ${v1.content.notIncluded.length} left off with reasons; sha-256 ${v1.content_hash.slice(0, 16)}…`);
   await submitBatch(c.deps, { orgId: org.id, batchId: batch.id, userId: user.id });
@@ -277,12 +277,12 @@ async function main(): Promise<number> {
   say("a second person approves version 1", approved.status === "approved");
 
   // A late order for the recalled batch arrives after approval.
-  const late = await payByCard(keys, { key: "late", amountMinor: 5900, currency: "USD", invoiceId: `R${stamp}-LATE`, payer: { email: "late.buyer@example.com", name: "Late Buyer" }, at: new Date(), item: { sku: "HM-300", title: "Hand mixer HM-300", quantity: 1, unitMinor: 5900 } });
+  const late = await payByCard(keys, { key: "late", amountMinor: 5900, currency: "USD", invoiceId: `R${stamp}-LATE`, payer: { email: "late.buyer@example.com", name: "Late Buyer" }, at: new Date(), item: { sku: "CM-412", title: "Mug set CM-412", quantity: 1, unitMinor: 5900 } });
   await db.tx((tx) => upsertOrder(tx, org.id, loaded.storeId, OrderImport.parse({
     externalId: `late-${stamp}`, orderNumber: `R${stamp}-LATE`, placedAt: new Date(Date.now() - 30 * 86_400_000).toISOString(), currency: "USD",
     customer: { email: "late.buyer@example.com", name: "Late Buyer" }, paymentMethod: "paypal", paymentReference: late.captureId, total: "59.00",
-    lines: [{ externalId: "l1", sku: "HM-300", title: "Hand mixer HM-300", quantity: 1, unitPrice: "59.00" }],
-    fulfilments: [{ externalId: "f1", shippedAt: new Date(Date.now() - 29 * 86_400_000).toISOString(), lines: [{ lineExternalId: "l1", quantity: 1, batchCode: "B-2217" }] }],
+    lines: [{ externalId: "l1", sku: "CM-412", title: "Mug set CM-412", quantity: 1, unitPrice: "59.00" }],
+    fulfilments: [{ externalId: "f1", shippedAt: new Date(Date.now() - 29 * 86_400_000).toISOString(), lines: [{ lineExternalId: "l1", quantity: 1, batchCode: "K-0719" }] }],
     raw: { synthetic: true },
   })));
   await lookupPaymentsByIds(c.deps, { orgId: org.id, connectionId: conn.id, provider, captureIds: [late.captureId] });

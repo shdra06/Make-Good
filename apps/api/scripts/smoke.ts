@@ -64,9 +64,9 @@ async function main(): Promise<void> {
   check("load sample data", seed.status === 200, `${seed.body?.orders} orders, ${seed.body?.payments} payments`);
 
   console.log("\nScenario A: manufacturing recall");
-  const incident = (await call("POST", `/api/orgs/${org}/incidents`, { kind: "recall", title: "HM-300 batch LOT-24B overheats" })).body.id;
+  const incident = (await call("POST", `/api/orgs/${org}/incidents`, { kind: "recall", title: "CM-412 batch LOT-24B fails a lead test" })).body.id;
   await call("POST", `/api/orgs/${org}/incidents/${incident}/rules`, {
-    scope: { type: "product", skus: ["HM-300"], batchCodes: ["LOT-24B"] },
+    scope: { type: "product", skus: ["CM-412"], batchCodes: ["LOT-24B"] },
     compensation: { type: "full_refund" },
   });
   const match = await call("POST", `/api/orgs/${org}/incidents/${incident}/match`);
@@ -103,10 +103,10 @@ async function main(): Promise<void> {
   }
 
   console.log("\nScenario D: currency exposure (live reference rates)");
-  const incident2 = (await call("POST", `/api/orgs/${org}/incidents`, { kind: "pricing_error", title: "Kettle sold above list price" })).body.id;
+  const incident2 = (await call("POST", `/api/orgs/${org}/incidents`, { kind: "pricing_error", title: "Teapot sold above list price" })).body.id;
   const today = new Date();
   await call("POST", `/api/orgs/${org}/incidents/${incident2}/rules`, {
-    scope: { type: "overcharge", sku: "KT-120", correctUnitPriceMinor: 3900, from: new Date(today.getTime() - 30 * 86400000).toISOString(), to: today.toISOString() },
+    scope: { type: "overcharge", sku: "TP-120", correctUnitPriceMinor: 3900, from: new Date(today.getTime() - 30 * 86400000).toISOString(), to: today.toISOString() },
     compensation: { type: "overcharge_difference" },
   });
   const over = await call("POST", `/api/orgs/${org}/incidents/${incident2}/match`);

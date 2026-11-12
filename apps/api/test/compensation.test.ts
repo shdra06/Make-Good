@@ -171,7 +171,7 @@ test("no PayPal payment: payout to the customer's email when allowed", () => {
 
 test("a bundle component with no price of its own is sent to a person", () => {
   const parent = line({ sku: "KIT", unitPriceMinor: 9900 });
-  const part = line({ sku: "HM-300", unitPriceMinor: 0, parentLineId: parent.id });
+  const part = line({ sku: "CM-412", unitPriceMinor: 0, parentLineId: parent.id });
   const { order: o, payment: p } = paidOrder({ lines: [parent, part] });
   assert.equal(calc({ type: "full_refund" }, o, part, p).route, "manual");
   assert.equal(calc({ type: "fixed_per_unit", fixedMinor: 2000, fixedCurrency: "USD" }, o, part, p).payableMinor, 2000, "a fixed amount still works");

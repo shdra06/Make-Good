@@ -13,7 +13,7 @@ const shopifyOrder = (n: number, extra: Record<string, unknown> = {}) => ({
   displayFinancialStatus: "PAID", paymentGatewayNames: ["paypal"], customer: { id: `gid://shopify/Customer/${n}`, displayName: `Buyer ${n}` },
   shippingAddress: { countryCodeV2: "US", name: `Buyer ${n}` },
   totalPriceSet: money("64.00"), totalDiscountsSet: money("0.00"), totalShippingPriceSet: money("5.00"), totalTaxSet: money("0.00"),
-  lineItems: { nodes: [{ id: `gid://shopify/LineItem/${n}`, sku: "HM-300", title: "Hand mixer", quantity: 1, originalUnitPriceSet: money("59.00"), totalDiscountSet: money("0.00") }] },
+  lineItems: { nodes: [{ id: `gid://shopify/LineItem/${n}`, sku: "CM-412", title: "Mug set", quantity: 1, originalUnitPriceSet: money("59.00"), totalDiscountSet: money("0.00") }] },
   transactions: [{ gateway: "paypal", kind: "SALE", status: "SUCCESS", authorizationCode: `PAYPAL-${n}` }],
   ...extra,
 });
@@ -22,7 +22,7 @@ async function setup() {
   const db = await testDb();
   const clock = new FakeClock("2026-11-12T09:00:00.000Z");
   const secrets = new SecretBox({ k1: generateEncryptionKey() }, "k1");
-  const [org] = await db.query<{ id: string }>("insert into organisations (name, slug) values ('Kitchen Co', 'kitchen-co') returning id");
+  const [org] = await db.query<{ id: string }>("insert into organisations (name, slug) values ('Emberline Ceramics', 'emberline-ceramics') returning id");
   const calls: { url: string; init: RequestInit }[] = [];
   let reply: (url: string, init: RequestInit) => Response = () => new Response("{}", { status: 500 });
   const fetchImpl: typeof fetch = async (url, init) => {
@@ -37,7 +37,7 @@ test("Shopify: connects with a working token only, reads every page, imports ord
   const deps = { db: s.db, clock: s.clock, secrets: s.secrets, fetchImpl: s.fetchImpl };
   s.setReply(() => new Response(JSON.stringify({ errors: [{ message: "Invalid API key or access token" }] }), { status: 401 }));
   await assert.rejects(
-    connectStore(deps, { orgId: s.orgId, kind: "shopify", data: { name: "Main", shopDomain: "kitchen-co.myshopify.com", accessToken: "shpat_wrong_token" } }),
+    connectStore(deps, { orgId: s.orgId, kind: "shopify", data: { name: "Main", shopDomain: "emberline-ceramics.myshopify.com", accessToken: "shpat_wrong_token" } }),
     /refused the access token/,
   );
   assert.equal((await s.db.query("select 1 from commerce_connections")).length, 0, "nothing is saved for a token that does not work");
@@ -49,13 +49,13 @@ test("Shopify: connects with a working token only, reads every page, imports ord
       page === 1 ? [shopifyOrder(1001), shopifyOrder(1002, { cancelledAt: "2026-10-02T00:00:00Z" })] : [shopifyOrder(1003, { displayFinancialStatus: "PARTIALLY_REFUNDED" })];
     return new Response(JSON.stringify({ data: { orders: { pageInfo: { hasNextPage: page === 1, endCursor: page === 1 ? "c1" : null }, nodes } } }), { status: 200 });
   });
-  const { id } = await connectStore(deps, { orgId: s.orgId, kind: "shopify", data: { name: "Main", shopDomain: "kitchen-co.myshopify.com", accessToken: "shpat_good_token" } });
+  const { id } = await connectStore(deps, { orgId: s.orgId, kind: "shopify", data: { name: "Main", shopDomain: "emberline-ceramics.myshopify.com", accessToken: "shpat_good_token" } });
   const [row] = await s.db.query<{ credentials_ciphertext: string; base_url: string }>("select credentials_ciphertext, base_url from commerce_connections where id = $1", [id]);
-  assert.equal(row!.base_url, "https://kitchen-co.myshopify.com");
+  assert.equal(row!.base_url, "https://emberline-ceramics.myshopify.com");
   assert.equal(row!.credentials_ciphertext.includes("shpat_good_token"), false, "the token is stored encrypted");
   const headers = s.calls.at(-1)!.init.headers as Record<string, string>;
   assert.equal(headers["X-Shopify-Access-Token"], "shpat_good_token");
-  assert.match(s.calls.at(-1)!.url, /^https:\/\/kitchen-co\.myshopify\.com\/admin\/api\/[\d-]+\/graphql\.json$/);
+  assert.match(s.calls.at(-1)!.url, /^https:\/\/emberline-ceramics\.myshopify\.com\/admin\/api\/[\d-]+\/graphql\.json$/);
 
   s.calls.length = 0;
   const out = await syncStore(deps, { orgId: s.orgId, storeId: id });
@@ -91,7 +91,7 @@ test("WooCommerce: refuses private addresses, reads pages, maps the PayPal trans
     billing: { email: `w${id}@example.com`, first_name: "Wren", last_name: `No${id}` }, shipping: { first_name: "Wren", last_name: `No${id}`, country: "DE" },
     payment_method: "ppcp-gateway", payment_method_title: "PayPal", transaction_id: `CAP-${id}`,
     discount_total: "5.00", shipping_total: "4.00", total_tax: "0.00", total: "49.00",
-    line_items: [{ id: id * 10, sku: "HM-300", name: "Hand mixer", quantity: 2, subtotal: "50.00", total: "45.00", total_tax: "0.00" }],
+    line_items: [{ id: id * 10, sku: "CM-412", name: "Mug set", quantity: 2, subtotal: "50.00", total: "45.00", total_tax: "0.00" }],
   });
   s.setReply((url) => {
     const page = Number(new URL(url).searchParams.get("page"));

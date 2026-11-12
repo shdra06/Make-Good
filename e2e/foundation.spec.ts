@@ -23,12 +23,12 @@ test("a merchant signs up, lands on the dashboard, signs out and signs in again"
   await page.getByLabel("Your name").fill("Priya Shah");
   await page.getByLabel("Work email").fill(email);
   await page.getByLabel("Password").fill(password);
-  await page.getByLabel("Shop name").fill("Shah Kitchenware");
+  await page.getByLabel("Shop name").fill("Shah Pottery");
   await page.getByRole("button", { name: "Create account" }).click();
 
   await expect(page).toHaveURL(/\/dashboard$/);
   await expect(page.getByRole("heading", { name: "Hello, Priya" })).toBeVisible();
-  await expect(page.getByText("Shah Kitchenware")).toBeVisible();
+  await expect(page.getByText("Shah Pottery")).toBeVisible();
   await expect(page.getByText("No incidents yet")).toBeVisible();
 
   await page.getByRole("button", { name: "Sign out" }).click();
@@ -59,9 +59,9 @@ test("the demo opens the recall case inside the app", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "Open the recall demo" }).first().click();
   await expect(page).toHaveURL(/\/incidents\/[0-9a-f-]{36}\/notice$/, { timeout: 60_000 });
-  await expect(page.getByRole("heading", { level: 1 })).toContainText("HM-300");
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("CM-412");
   await page.getByRole("link", { name: "Dashboard" }).click();
-  await expect(page.getByRole("cell", { name: /HM-300/ })).toBeVisible();
+  await expect(page.getByRole("cell", { name: /CM-412/ })).toBeVisible();
 });
 
 test("an unknown page shows a clear not-found page", async ({ page }) => {

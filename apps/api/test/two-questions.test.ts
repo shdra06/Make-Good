@@ -12,11 +12,11 @@ import { adjustment, at, batch, fulfilment, line, order, paidOrder, payment } fr
 
 const NOW = at("2026-10-01");
 const recall = (extra: Record<string, unknown> = {}) =>
-  IncidentScope.parse({ type: "product", skus: ["HM-300"], batchCodes: ["B-2217"], ...extra });
+  IncidentScope.parse({ type: "product", skus: ["CM-412"], batchCodes: ["K-0719"], ...extra });
 const match = (input: Partial<MatchInput> & { scope: MatchInput["scope"] }) =>
   runMatch({ now: NOW, orders: [], payments: [], batches: [], ...input });
 
-const affectedLine = () => line({ fulfilments: [fulfilment({ quantity: 1, batchCode: "B-2217" })] });
+const affectedLine = () => line({ fulfilments: [fulfilment({ quantity: 1, batchCode: "K-0719" })] });
 const undocumentedLine = () => line({ fulfilments: [fulfilment({ quantity: 1, shippedAt: null })] });
 
 /** Ties a payment to an order the way the import does when the payment carries the order number. */
@@ -53,8 +53,8 @@ test("quadrant 1: verified payment and proven batch is ready for a person to app
 test("quadrant 2: verified payment and uncertain batch is held for more evidence", () => {
   const { order: o, payment: p } = paidOrder({ lines: [line({ fulfilments: [fulfilment({ quantity: 1, shippedAt: at("2026-09-10") })] })] });
   const batches = [
-    batch({ batchCode: "B-2217", firstShippedAt: at("2026-09-05"), lastShippedAt: at("2026-09-15") }),
-    batch({ batchCode: "B-2224", firstShippedAt: at("2026-09-08"), lastShippedAt: at("2026-09-30") }),
+    batch({ batchCode: "K-0719", firstShippedAt: at("2026-09-05"), lastShippedAt: at("2026-09-15") }),
+    batch({ batchCode: "K-0726", firstShippedAt: at("2026-09-08"), lastShippedAt: at("2026-09-30") }),
   ];
   const c = match({ scope: recall(), orders: [o], payments: [p], batches }).candidates[0]!;
   assert.deepEqual([c.paymentIdentity, c.eligibility, c.decision], ["verified", "uncertain", "needs_eligibility_evidence"]);
@@ -108,7 +108,7 @@ test("PayPal's own payment ID on the order beats a shared invoice number", () =>
 });
 
 test("an order paid in parts is verified, and choosing the largest part is marked as our assumption", () => {
-  const o = order({ lines: [line({ quantity: 2, fulfilments: [fulfilment({ quantity: 2, batchCode: "B-2217" })] })] });
+  const o = order({ lines: [line({ quantity: 2, fulfilments: [fulfilment({ quantity: 2, batchCode: "K-0719" })] })] });
   const big = payment({ invoiceId: o.orderNumber, grossMinor: 8000 });
   const small = payment({ invoiceId: o.orderNumber, grossMinor: o.totalMinor - 8000 });
   linkByInvoice(o, big);
@@ -144,7 +144,7 @@ test("a guessed link is an inference, never a fact", () => {
 
 test("PayPal data alone never proves a batch", () => {
   // A payment that names the product, for the right amount, in the right week: still not proof of the batch.
-  const named = payment({ items: [{ code: "HM-300", name: "Hand mixer HM-300 batch B-2217", quantity: 1, unitMinor: 5900 }] });
+  const named = payment({ items: [{ code: "CM-412", name: "Mug set CM-412 batch K-0719", quantity: 1, unitMinor: 5900 }] });
   const known = paidOrder({ lines: [affectedLine()] });
   const cs = match({ scope: recall(), orders: [known.order], payments: [known.payment, named] }).candidates;
   const loose = cs.find((c) => c.paymentId === named.id)!;
@@ -166,7 +166,7 @@ test("each piece of evidence is marked as a fact, an inference or an assumption"
   const packed = paidOrder({ lines: [affectedLine()] });
   const inferred = paidOrder({ lines: [line({ fulfilments: [fulfilment({ quantity: 1, shippedAt: at("2026-08-20"), warehouse: "east" })] })] });
   const assumed = paidOrder({ lines: [line({ fulfilments: [fulfilment({ quantity: 1, shippedAt: at("2026-09-10") })] })] });
-  const batches = [batch({ batchCode: "B-2217", warehouse: "east", firstShippedAt: at("2026-08-10"), lastShippedAt: at("2026-08-30") })];
+  const batches = [batch({ batchCode: "K-0719", warehouse: "east", firstShippedAt: at("2026-08-10"), lastShippedAt: at("2026-08-30") })];
   const cs = match({
     scope,
     orders: [packed.order, inferred.order, assumed.order],
@@ -186,7 +186,7 @@ test("each piece of evidence is marked as a fact, an inference or an assumption"
 
 test("a replacement makes the unit the customer holds uncertain, even though the first one was proven", () => {
   const { order: o, payment: p } = paidOrder({
-    lines: [line({ fulfilments: [fulfilment({ quantity: 1, batchCode: "B-2217" })], adjustments: [adjustment({ kind: "replacement", quantity: 1 })] })],
+    lines: [line({ fulfilments: [fulfilment({ quantity: 1, batchCode: "K-0719" })], adjustments: [adjustment({ kind: "replacement", quantity: 1 })] })],
   });
   const c = match({ scope: recall(), orders: [o], payments: [p] }).candidates[0]!;
   assert.equal(c.eligibility, "uncertain");
@@ -195,9 +195,9 @@ test("a replacement makes the unit the customer holds uncertain, even though the
 });
 
 test("buyers shown not to be affected are kept, with the record that cleared them", () => {
-  const other = paidOrder({ lines: [line({ fulfilments: [fulfilment({ quantity: 1, batchCode: "B-2224" })] })] });
+  const other = paidOrder({ lines: [line({ fulfilments: [fulfilment({ quantity: 1, batchCode: "K-0726" })] })] });
   const mixed = paidOrder({
-    lines: [line({ quantity: 2, fulfilments: [fulfilment({ quantity: 1, batchCode: "B-2217" }), fulfilment({ quantity: 1, batchCode: "B-2224" })] })],
+    lines: [line({ quantity: 2, fulfilments: [fulfilment({ quantity: 1, batchCode: "K-0719" }), fulfilment({ quantity: 1, batchCode: "K-0726" })] })],
   });
   const out = match({ scope: recall(), orders: [other.order, mixed.order], payments: [other.payment, mixed.payment] });
   assert.equal(out.candidates.length, 1, "only the affected unit is a candidate");
@@ -222,9 +222,9 @@ test("payment states are a decision of their own: a dispute holds, a full refund
 // ---------- product codes written differently ----------
 
 test("a product code written differently is not matched until a person confirms the alias", () => {
-  const messy = paidOrder({ lines: [line({ sku: "HM300", title: "Hand Mixer 300 W", fulfilments: [fulfilment({ quantity: 1, batchCode: "B-2217" })] })] });
-  const noCode = paidOrder({ lines: [line({ sku: null, title: "Hand mixer HM-300 (white)", fulfilments: [fulfilment({ quantity: 1, batchCode: "B-2217" })] })] });
-  const lookalike = paidOrder({ lines: [line({ sku: "HM-3000", title: "Stand mixer HM-3000", fulfilments: [fulfilment({ quantity: 1, batchCode: "B-2217" })] })] });
+  const messy = paidOrder({ lines: [line({ sku: "CM412", title: "Mug Set 412 W", fulfilments: [fulfilment({ quantity: 1, batchCode: "K-0719" })] })] });
+  const noCode = paidOrder({ lines: [line({ sku: null, title: "Mug set CM-412 (white)", fulfilments: [fulfilment({ quantity: 1, batchCode: "K-0719" })] })] });
+  const lookalike = paidOrder({ lines: [line({ sku: "CM-4120", title: "Dinner set CM-4120", fulfilments: [fulfilment({ quantity: 1, batchCode: "K-0719" })] })] });
   const input = {
     scope: recall(),
     orders: [messy.order, noCode.order, lookalike.order],
@@ -235,16 +235,16 @@ test("a product code written differently is not matched until a person confirms 
   const withAliases = match({
     ...input,
     aliases: [
-      { id: "alias-1", kind: "sku", alias: "hm300", canonicalSku: "HM-300", confirmedBy: "Olive" },
-      { id: "alias-2", kind: "title", alias: "Hand Mixer HM-300 (White)", canonicalSku: "HM-300", confirmedBy: "Olive" },
+      { id: "alias-1", kind: "sku", alias: "cm412", canonicalSku: "CM-412", confirmedBy: "Olive" },
+      { id: "alias-2", kind: "title", alias: "Mug Set CM-412 (White)", canonicalSku: "CM-412", confirmedBy: "Olive" },
     ],
   }).candidates;
-  assert.equal(withAliases.length, 2, "the look-alike product HM-3000 is still left out");
+  assert.equal(withAliases.length, 2, "the look-alike product CM-4120 is still left out");
   for (const c of withAliases) {
     assert.equal(c.decision, "ready_for_approval");
     const alias = c.evidence.find((e) => e.source === "product_alias")!;
     assert.equal(alias.kind, "inference");
     assert.match(alias.fact, /Olive confirmed/);
   }
-  assert.equal(withAliases.find((c) => c.orderId === messy.order.id)!.facts.matchedAlias, "hm300");
+  assert.equal(withAliases.find((c) => c.orderId === messy.order.id)!.facts.matchedAlias, "cm412");
 });

@@ -158,7 +158,7 @@ export function readWithPatternRules(document: string, catalogueSkus: readonly s
     for (const sku of catalogueSkus) {
       const code = sku.trim();
       if (code.length < 3) continue;
-      // The code must stand alone: HM-300 is not found inside HM-3000 or HM-300-EU.
+      // The code must stand alone: CM-412 is not found inside CM-4120 or CM-412-GB.
       const found = new RegExp(`(?<![A-Za-z0-9-])${escape(code)}(?![A-Za-z0-9-])`, "i").exec(sentence);
       // Reported as the document writes it, not as some order line happened to spell it.
       if (found) out.products.push({ code: found[0], name: "", included: !negated, quote: sentence });

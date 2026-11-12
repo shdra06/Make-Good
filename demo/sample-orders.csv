@@ -1,4 +1,4 @@
 order_number,placed_at,currency,customer_email,customer_name,paypal_payment_id,sku,title,quantity,unit_price,shipping,shipped_at,batch_code
-#7001,2026-10-20,USD,ana.k@example.com,Ana K,,KT-120,Kettle KT-120,1,39.00,5.00,2026-10-21,
-#7002,2026-10-21,USD,lee.m@example.com,Lee M,,KT-120,Kettle KT-120,2,39.00,5.00,2026-10-22,
+#7001,2026-10-20,USD,ana.k@example.com,Ana K,,TP-120,Teapot TP-120,1,39.00,5.00,2026-10-21,
+#7002,2026-10-21,USD,lee.m@example.com,Lee M,,TP-120,Teapot TP-120,2,39.00,5.00,2026-10-22,
 #7002,2026-10-21,USD,lee.m@example.com,Lee M,,TS-10,Toaster TS-10,1,24.00,,2026-10-22,

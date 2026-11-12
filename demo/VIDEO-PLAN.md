@@ -7,7 +7,7 @@ Output: `demo/video/make-good-submission.mp4`, 1920 x 1080, about 3 min 47 s, wi
 | Time | Part | On screen | Point made |
 |---|---|---|---|
 | 0:00 | Title | Logo, one-line promise, four chips | What it is |
-| 0:07 | The problem (animation) | A recall notice, 40 orders with question marks, records that disagree (HM300, HM-3000, no batch code, two payments), then "refund everyone" ($ wasted) against "wait" (disputes pile up) | Why this is hard, and what it costs |
+| 0:07 | The problem (animation) | A recall notice, 40 orders with question marks, records that disagree (CM412, CM-4120, no batch code, two payments), then "refund everyone" ($ wasted) against "wait" (disputes pile up) | Why this is hard, and what it costs |
 | 0:35 | Our approach (animation) | Two questions per buyer; orders sort into ready, held for a person, not affected; one approved list; PayPal refunds each once; disputes 0, paid twice 0 | The idea in one picture |
 | 1:02 | Built with | Eight tiles: PayPal REST APIs, PayPal sandbox, Node 24 + TypeScript, PostgreSQL, Gemini, plain HTML/CSS/JS, 120 tests, Playwright | What it is built with |
 | 1:22 | The app, step by step | Real page in Edge with a visible cursor, a highlight on what is being explained, and a caption per step | How to navigate, and what each feature does |

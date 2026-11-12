@@ -24,10 +24,10 @@ export const DEMO_STORE_NAME = "Demo store (sample data)";
 
 type Product = { sku: string; title: string; priceMinor: number };
 const PRODUCTS: Product[] = [
-  { sku: "HM-300", title: "Hand mixer HM-300", priceMinor: 5900 },
-  { sku: "HM-500", title: "Stand mixer HM-500", priceMinor: 24900 },
-  { sku: "KT-120", title: "Kettle KT-120", priceMinor: 3900 },
-  { sku: "PLAN-PRO", title: "Recipe club, monthly", priceMinor: 1200 },
+  { sku: "CM-412", title: "Mug set CM-412", priceMinor: 5900 },
+  { sku: "CM-500", title: "Dinner set CM-500", priceMinor: 24900 },
+  { sku: "TP-120", title: "Teapot TP-120", priceMinor: 3900 },
+  { sku: "PLAN-PRO", title: "Pottery club, monthly", priceMinor: 1200 },
 ];
 
 const NAMES = ["Asha Rao", "Ben Ortiz", "Chen Wei", "Dana Novak", "Emre Kaya", "Fatima Zahra", "Giorgos Pappas", "Hana Sato", "Ivan Petrov", "Julia Costa", "Kofi Mensah", "Lena Fischer"];
@@ -54,9 +54,9 @@ export async function seedDemoData(
 
   // Stock: the affected batch shipped alone for a week, then overlapped with the next one.
   const batches = [
-    { sku: "HM-300", batchCode: "LOT-23A", firstShippedAt: daysAgo(70), lastShippedAt: daysAgo(41) },
-    { sku: "HM-300", batchCode: "LOT-24B", firstShippedAt: daysAgo(40), lastShippedAt: daysAgo(22) },
-    { sku: "HM-300", batchCode: "LOT-25C", firstShippedAt: daysAgo(27), lastShippedAt: daysAgo(2) },
+    { sku: "CM-412", batchCode: "LOT-23A", firstShippedAt: daysAgo(70), lastShippedAt: daysAgo(41) },
+    { sku: "CM-412", batchCode: "LOT-24B", firstShippedAt: daysAgo(40), lastShippedAt: daysAgo(22) },
+    { sku: "CM-412", batchCode: "LOT-25C", firstShippedAt: daysAgo(27), lastShippedAt: daysAgo(2) },
   ];
   await db.tx(async (tx) => {
     for (const b of batches) {
@@ -122,35 +122,35 @@ export async function seedDemoData(
     orders++;
   }
 
-  const [hm300, hm500, kettle, plan] = PRODUCTS as [Product, Product, Product, Product];
+  const [cm412, cm500, teapot, plan] = PRODUCTS as [Product, Product, Product, Product];
   // Affected batch, recorded at packing.
-  for (let i = 0; i < 14; i++) await sell({ product: hm300, placedDaysAgo: 39 - i, batchCode: "LOT-24B", quantity: i % 6 === 0 ? 2 : 1 });
+  for (let i = 0; i < 14; i++) await sell({ product: cm412, placedDaysAgo: 39 - i, batchCode: "LOT-24B", quantity: i % 6 === 0 ? 2 : 1 });
   // Shipped while only the affected batch was going out, but nobody wrote the batch down.
-  for (let i = 0; i < 5; i++) await sell({ product: hm300, placedDaysAgo: 37 - i, shippedDaysAgo: 36 - i, batchCode: null });
+  for (let i = 0; i < 5; i++) await sell({ product: cm412, placedDaysAgo: 37 - i, shippedDaysAgo: 36 - i, batchCode: null });
   // Shipped while two batches overlapped: mixed stock.
-  for (let i = 0; i < 6; i++) await sell({ product: hm300, placedDaysAgo: 28 - i, shippedDaysAgo: 27 - i, batchCode: null });
+  for (let i = 0; i < 6; i++) await sell({ product: cm412, placedDaysAgo: 28 - i, shippedDaysAgo: 27 - i, batchCode: null });
   // Other batches: proven not affected.
-  for (let i = 0; i < 9; i++) await sell({ product: hm300, placedDaysAgo: 60 - i * 2, batchCode: "LOT-23A" });
-  for (let i = 0; i < 7; i++) await sell({ product: hm300, placedDaysAgo: 18 - i * 2, batchCode: "LOT-25C" });
+  for (let i = 0; i < 9; i++) await sell({ product: cm412, placedDaysAgo: 60 - i * 2, batchCode: "LOT-23A" });
+  for (let i = 0; i < 7; i++) await sell({ product: cm412, placedDaysAgo: 18 - i * 2, batchCode: "LOT-25C" });
   // Edge cases for the affected batch.
-  await sell({ product: hm300, placedDaysAgo: 33, batchCode: "LOT-24B", card: true }); // paid by card
-  await sell({ product: hm300, placedDaysAgo: 34, batchCode: "LOT-24B", returned: 1 }); // sent back already
-  await sell({ product: hm300, placedDaysAgo: 35, batchCode: "LOT-24B", quantity: 2, returned: 1 }); // kept one of two
-  await sell({ product: hm300, placedDaysAgo: 31, shippedDaysAgo: null }); // no shipping record at all
+  await sell({ product: cm412, placedDaysAgo: 33, batchCode: "LOT-24B", card: true }); // paid by card
+  await sell({ product: cm412, placedDaysAgo: 34, batchCode: "LOT-24B", returned: 1 }); // sent back already
+  await sell({ product: cm412, placedDaysAgo: 35, batchCode: "LOT-24B", quantity: 2, returned: 1 }); // kept one of two
+  await sell({ product: cm412, placedDaysAgo: 31, shippedDaysAgo: null }); // no shipping record at all
   // Customers abroad, paying in their own currency.
-  await sell({ product: hm300, placedDaysAgo: 30, batchCode: "LOT-24B", currency: "EUR", country: "DE" });
-  await sell({ product: hm300, placedDaysAgo: 29, batchCode: "LOT-24B", currency: "EUR", country: "FR" });
-  await sell({ product: hm300, placedDaysAgo: 28, batchCode: "LOT-24B", currency: "GBP", country: "GB" });
-  await sell({ product: hm300, placedDaysAgo: 32, batchCode: "LOT-24B", currency: "JPY", country: "JP" });
+  await sell({ product: cm412, placedDaysAgo: 30, batchCode: "LOT-24B", currency: "EUR", country: "DE" });
+  await sell({ product: cm412, placedDaysAgo: 29, batchCode: "LOT-24B", currency: "EUR", country: "FR" });
+  await sell({ product: cm412, placedDaysAgo: 28, batchCode: "LOT-24B", currency: "GBP", country: "GB" });
+  await sell({ product: cm412, placedDaysAgo: 32, batchCode: "LOT-24B", currency: "JPY", country: "JP" });
   // Other products, for a realistic catalogue.
-  for (let i = 0; i < 8; i++) await sell({ product: hm500, placedDaysAgo: 50 - i * 5 });
-  for (let i = 0; i < 10; i++) await sell({ product: kettle, placedDaysAgo: 45 - i * 4 });
+  for (let i = 0; i < 8; i++) await sell({ product: cm500, placedDaysAgo: 50 - i * 5 });
+  for (let i = 0; i < 10; i++) await sell({ product: teapot, placedDaysAgo: 45 - i * 4 });
   // Too old for PayPal to refund the original payment.
-  await sell({ product: hm500, placedDaysAgo: 200, batchCode: null });
+  await sell({ product: cm500, placedDaysAgo: 200, batchCode: null });
   // A billing error: the checkout charged three customers twice this week.
-  for (let i = 0; i < 3; i++) await sell({ product: kettle, placedDaysAgo: 3 + i, doubleCharge: true });
-  // A price mistake: the kettle was sold above its listed price for two days.
-  for (let i = 0; i < 4; i++) await sell({ product: kettle, placedDaysAgo: 9 + (i % 2), unitMinor: 4900 });
+  for (let i = 0; i < 3; i++) await sell({ product: teapot, placedDaysAgo: 3 + i, doubleCharge: true });
+  // A price mistake: the teapot was sold above its listed price for two days.
+  for (let i = 0; i < 4; i++) await sell({ product: teapot, placedDaysAgo: 9 + (i % 2), unitMinor: 4900 });
   // Subscriptions, for a service outage.
   for (let i = 0; i < 6; i++) await sell({ product: plan, placedDaysAgo: 20 - i, service: true });
 
@@ -167,7 +167,7 @@ export async function seedDemoData(
 
 /**
  * Loads the flagship test case on a simulator connection: a supplier recall
- * of one batch of the HM-300 hand mixer, with deliberately untidy records and
+ * of one batch of the CM-412 mug set, with deliberately untidy records and
  * the right answer stored for each. See recall-scenario.ts.
  */
 export async function seedRecallScenario(

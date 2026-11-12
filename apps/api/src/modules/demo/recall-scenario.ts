@@ -1,5 +1,5 @@
 // The flagship test case: a supplier recalls one production batch of a hand
-// mixer, and the merchant's records are as untidy as real ones.
+// mug set, and the merchant's records are as untidy as real ones.
 //
 // EVERYTHING the merchant "knows" here is invented: the supplier notice, the
 // orders, the stock records. It is stored with the label "synthetic". The
@@ -23,9 +23,9 @@ import { BatchImport, ensureVariant, OrderImport, upsertBatch, upsertOrder } fro
 import type { PayPalProvider } from "../paypal/provider.ts";
 import { linkOrdersToPayments } from "../transactions/sync.ts";
 
-export const RECALL_DATASET = "hm300-recall-v1";
-export const RECALL_STORE_NAME = "Kitchen store (synthetic records)";
-export const AFFECTED_BATCH = "B-2217";
+export const RECALL_DATASET = "cm412-recall-v1";
+export const RECALL_STORE_NAME = "Pottery store (synthetic records)";
+export const AFFECTED_BATCH = "K-0719";
 
 export type PayRequest = {
   key: string;
@@ -78,33 +78,33 @@ export type ScenarioData = {
   skipped: Array<{ caseTag: string; why: string }>;
 };
 
-const HM300 = { sku: "HM-300", title: "Hand mixer HM-300", unitMinor: 5900 };
+const CM412 = { sku: "CM-412", title: "Mug set CM-412", unitMinor: 5900 };
 const longDate = (d: Date) => d.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
 
 /** The supplier's notice. Written the way such notices are: the facts are there, spread across sentences, with distractors. */
 export function recallNotice(now: Date): { title: string; body: string } {
   const ago = (days: number) => longDate(new Date(now.getTime() - days * DAY));
   return {
-    title: "Safety recall notice KA-RN-2026-031 (Kestrel Appliances)",
+    title: "Safety recall notice WP-RN-2026-031 (Wrenfield Pottery)",
     body: [
-      "SAFETY RECALL NOTICE  Ref. KA-RN-2026-031",
-      "From: Kestrel Appliances Ltd, Quality Assurance",
+      "SAFETY RECALL NOTICE  Ref. WP-RN-2026-031",
+      "From: Wrenfield Pottery Ltd, Quality Assurance",
       "To: all retail partners",
       `Date: ${ago(9)}`,
       "",
-      "Product: HM-300 hand mixer (catalogue code HM-300). The EU-plug version, sold as HM-300-EU, is the same unit and is included in this recall.",
+      "Product: CM-412 mug set (catalogue code CM-412). The gift-boxed version, sold as CM-412-GB, is the same set and is included in this recall.",
       "",
-      `Affected production batch: ${AFFECTED_BATCH} only. The batch code is printed on the rating label under the motor housing and on the carton flap.`,
+      `Affected production batch: ${AFFECTED_BATCH} only. The batch code is the kiln firing number, stamped on the base of each mug and printed on the box.`,
       "",
-      "Not affected: batches B-2209 and B-2224 of the same model, and the HM-3000 stand mixer, which uses a different motor.",
+      "Not affected: batches K-0711 and K-0726 of the same model, and the CM-4120 dinner set, which uses a different glaze.",
       "",
-      "Fault: the speed controller can overheat after about ten minutes of continuous use.",
+      "Fault: the glaze from this firing can release lead into hot or acidic drinks above the legal limit.",
       "",
       `Batch ${AFFECTED_BATCH} left our warehouse for retail partners between ${ago(52)} and ${ago(44)}.`,
       "",
-      `Action for retailers: stop sale of batch ${AFFECTED_BATCH}, contact buyers, and offer a full refund of the purchase price. Units need not be returned.`,
+      `Action for retailers: stop sale of batch ${AFFECTED_BATCH}, contact buyers, and offer a full refund of the purchase price. Mugs need not be returned.`,
       "",
-      "Questions: recalls@kestrel-appliances.example",
+      "Questions: recalls@wrenfield-pottery.example",
     ].join("\n"),
   };
 }
@@ -150,7 +150,7 @@ export async function buildRecallScenario(io: ScenarioIo): Promise<ScenarioData>
     const orderNumber = sale.orderNumber ?? `${io.prefix}${n}`;
     const customer = sale.customer ?? { email: `buyer.${n}@example.com`, name: `Buyer ${n}` };
     const placedAt = daysAgo(sale.placedDaysAgo, n % 400);
-    const lines = sale.lines.map((l, i) => ({ ...l, externalId: `l${i + 1}`, quantity: l.quantity ?? 1, unitMinor: l.unitMinor ?? HM300.unitMinor }));
+    const lines = sale.lines.map((l, i) => ({ ...l, externalId: `l${i + 1}`, quantity: l.quantity ?? 1, unitMinor: l.unitMinor ?? CM412.unitMinor }));
     const subtotal = lines.reduce((a, l) => a + l.unitMinor * l.quantity, 0);
     const total = subtotal - (sale.discountMinor ?? 0) + (sale.shippingMinor ?? 0);
 
@@ -214,21 +214,21 @@ export async function buildRecallScenario(io: ScenarioIo): Promise<ScenarioData>
   }
 
   const packed = (days: number, batchCode: string | null = AFFECTED_BATCH, quantity?: number) => [{ daysAgo: days, batchCode, quantity }];
-  const hm = (extra: Partial<LineSpec> = {}): LineSpec => ({ sku: HM300.sku, title: HM300.title, ...extra });
+  const hm = (extra: Partial<LineSpec> = {}): LineSpec => ({ sku: CM412.sku, title: CM412.title, ...extra });
   const one = (affectedUnits: number, owedMinor: number) => [{ line: 0, affectedUnits, owedMinor }];
 
   // ---- A. Purchases the records settle completely ----
   await sell({ tag: "clean", note: "Batch recorded at packing; PayPal's payment ID recorded on the order.", placedDaysAgo: 38, lines: [hm({ shipped: packed(37) })], payment: "reference", truth: one(1, 5900) });
   await sell({ tag: "clean", note: "As above.", placedDaysAgo: 36, lines: [hm({ shipped: packed(35) })], payment: "reference", truth: one(1, 5900) });
   await sell({ tag: "two_units", note: "Two units, both from the recalled batch.", placedDaysAgo: 35, lines: [hm({ quantity: 2, shipped: packed(34) })], payment: "reference", truth: one(2, 11800) });
-  await sell({ tag: "batch_code_written_differently", note: "The packer wrote 'b 2217'. Same batch.", placedDaysAgo: 33, lines: [hm({ shipped: packed(32, "b 2217") })], payment: "reference", truth: one(1, 5900) });
-  await sell({ tag: "product_code_case_and_spaces", note: "Product code typed in lower case with a space, title in capitals.", placedDaysAgo: 32, lines: [hm({ sku: " hm-300", title: "HAND MIXER HM-300 WHT", shipped: packed(31) })], payment: "reference", truth: one(1, 5900) });
+  await sell({ tag: "batch_code_written_differently", note: "The packer wrote 'k 0719'. Same batch.", placedDaysAgo: 33, lines: [hm({ shipped: packed(32, "k 0719") })], payment: "reference", truth: one(1, 5900) });
+  await sell({ tag: "product_code_case_and_spaces", note: "Product code typed in lower case with a space, title in capitals.", placedDaysAgo: 32, lines: [hm({ sku: " cm-412", title: "MUG SET CM-412 WHT", shipped: packed(31) })], payment: "reference", truth: one(1, 5900) });
   await sell({
-    tag: "multi_item_order", note: "Mixer and kettle in one order, with a 10% order discount and shipping. Only the mixer's share is owed: 59.00 less 5.90 of the discount.",
-    placedDaysAgo: 31, lines: [hm({ shipped: packed(30) }), { sku: "KT-120", title: "Kettle KT-120", unitMinor: 3900, shipped: [{ daysAgo: 30 }] }],
+    tag: "multi_item_order", note: "Mug set and teapot in one order, with a 10% order discount and shipping. Only the mug set's share is owed: 59.00 less 5.90 of the discount.",
+    placedDaysAgo: 31, lines: [hm({ shipped: packed(30) }), { sku: "TP-120", title: "Teapot TP-120", unitMinor: 3900, shipped: [{ daysAgo: 30 }] }],
     discountMinor: 980, shippingMinor: 600, payment: "reference", truth: one(1, 5310),
   });
-  await sell({ tag: "eu_plug_variant", note: "The EU-plug version. The supplier's notice says it is included.", placedDaysAgo: 30, lines: [{ sku: "HM-300-EU", title: "Hand mixer HM-300 (EU plug)", shipped: packed(29) }], payment: "reference", truth: one(1, 5900) });
+  await sell({ tag: "eu_plug_variant", note: "The gift-boxed version. The supplier's notice says it is included.", placedDaysAgo: 30, lines: [{ sku: "CM-412-GB", title: "Mug set CM-412 (gift box)", shipped: packed(29) }], payment: "reference", truth: one(1, 5900) });
   await sell({
     tag: "partly_refunded_before", note: "The store already gave 20.00 back for a late delivery. Only 39.00 is left to refund.",
     placedDaysAgo: 29, lines: [hm({ shipped: packed(28) })], payment: "reference", truth: one(1, 3900),
@@ -239,24 +239,24 @@ export async function buildRecallScenario(io: ScenarioIo): Promise<ScenarioData>
   });
   await sell({
     tag: "units_from_two_batches", note: "Two units in one line: one from the recalled batch, one from the next batch. One unit is owed.",
-    placedDaysAgo: 26, lines: [hm({ quantity: 2, shipped: [{ daysAgo: 25, quantity: 1, batchCode: AFFECTED_BATCH }, { daysAgo: 25, quantity: 1, batchCode: "B-2224" }] })],
+    placedDaysAgo: 26, lines: [hm({ quantity: 2, shipped: [{ daysAgo: 25, quantity: 1, batchCode: AFFECTED_BATCH }, { daysAgo: 25, quantity: 1, batchCode: "K-0726" }] })],
     payment: "reference", truth: one(1, 5900),
   });
   const repeat = { email: "sam.rivera@example.com", name: "Sam Rivera" };
   await sell({ tag: "repeat_customer", note: "Sam Rivera's first purchase: recalled batch.", customer: repeat, placedDaysAgo: 34, lines: [hm({ shipped: packed(33) })], payment: "reference", truth: one(1, 5900) });
-  await sell({ tag: "repeat_customer", note: "Sam Rivera's second purchase, three weeks later: a later batch. Not affected, and must not be paid because the first one was.", customer: repeat, placedDaysAgo: 12, lines: [hm({ shipped: packed(11, "B-2224") })], payment: "reference", truth: one(0, 0) });
+  await sell({ tag: "repeat_customer", note: "Sam Rivera's second purchase, three weeks later: a later batch. Not affected, and must not be paid because the first one was.", customer: repeat, placedDaysAgo: 12, lines: [hm({ shipped: packed(11, "K-0726") })], payment: "reference", truth: one(0, 0) });
 
   // ---- B. Same product, other batches: must be left out ----
-  await sell({ tag: "other_batch", note: "Earlier batch B-2209, recorded at packing.", placedDaysAgo: 55, lines: [hm({ shipped: packed(54, "B-2209") })], payment: "reference", truth: one(0, 0) });
-  await sell({ tag: "other_batch", note: "Later batch B-2224, recorded at packing.", placedDaysAgo: 10, lines: [hm({ shipped: packed(9, "B-2224") })], payment: "reference", truth: one(0, 0) });
+  await sell({ tag: "other_batch", note: "Earlier batch K-0711, recorded at packing.", placedDaysAgo: 55, lines: [hm({ shipped: packed(54, "K-0711") })], payment: "reference", truth: one(0, 0) });
+  await sell({ tag: "other_batch", note: "Later batch K-0726, recorded at packing.", placedDaysAgo: 10, lines: [hm({ shipped: packed(9, "K-0726") })], payment: "reference", truth: one(0, 0) });
   await sell({
-    tag: "similar_product_code", note: "A different product (stand mixer HM-3000) whose carton happens to carry the same batch number. Not part of the recall.",
-    placedDaysAgo: 30, lines: [{ sku: "HM-3000", title: "Stand mixer HM-3000", unitMinor: 24900, shipped: packed(29) }], payment: "reference", truth: one(0, 0),
+    tag: "similar_product_code", note: "A different product (dinner set CM-4120) whose box happens to carry the same batch number. Not part of the recall.",
+    placedDaysAgo: 30, lines: [{ sku: "CM-4120", title: "Dinner set CM-4120", unitMinor: 24900, shipped: packed(29) }], payment: "reference", truth: one(0, 0),
   });
 
   // ---- C. Product written in a way the catalogue does not know ----
-  await sell({ tag: "product_code_without_hyphen", note: "Entered by phone sales as 'HM300'. It is the recalled mixer, from the recalled batch.", placedDaysAgo: 28, lines: [{ sku: "HM300", title: "Hand Mixer 300W", shipped: packed(27) }], payment: "reference", truth: one(1, 5900) });
-  await sell({ tag: "no_product_code", note: "A marketplace order with no product code at all, only a title. Recalled mixer, recalled batch.", placedDaysAgo: 27, lines: [{ sku: null, title: "Kestrel hand mixer HM-300 white", shipped: packed(26) }], payment: "reference", truth: one(1, 5900) });
+  await sell({ tag: "product_code_without_hyphen", note: "Entered by phone sales as 'CM412'. It is the recalled mug set, from the recalled batch.", placedDaysAgo: 28, lines: [{ sku: "CM412", title: "Mug Set 412", shipped: packed(27) }], payment: "reference", truth: one(1, 5900) });
+  await sell({ tag: "no_product_code", note: "A marketplace order with no product code at all, only a title. Recalled mug set, recalled batch.", placedDaysAgo: 27, lines: [{ sku: null, title: "Wrenfield mug set CM-412 white", shipped: packed(26) }], payment: "reference", truth: one(1, 5900) });
 
   // ---- D. No batch recorded at packing ----
   await sell({ tag: "no_batch_single_stock", note: "No batch written down. Shipped while only the recalled batch was going out. In truth: affected.", placedDaysAgo: 34, lines: [hm({ shipped: packed(33, null) })], payment: "reference", truth: one(1, 5900) });
@@ -301,14 +301,14 @@ export async function buildRecallScenario(io: ScenarioIo): Promise<ScenarioData>
   }
 
   // ---- G. The rest of the shop: other electronics, not part of the incident ----
-  await sell({ tag: "other_product", note: "", placedDaysAgo: 28, lines: [{ sku: "KT-120", title: "Kettle KT-120", unitMinor: 3900, shipped: [{ daysAgo: 27 }] }], payment: "reference", truth: [] });
+  await sell({ tag: "other_product", note: "", placedDaysAgo: 28, lines: [{ sku: "TP-120", title: "Teapot TP-120", unitMinor: 3900, shipped: [{ daysAgo: 27 }] }], payment: "reference", truth: [] });
   if (mode === "simulator") {
-    await sell({ tag: "other_product", note: "", placedDaysAgo: 21, lines: [{ sku: "BL-80", title: "Blender BL-80", unitMinor: 8900, shipped: [{ daysAgo: 20 }] }], payment: "reference", truth: [] });
-    await sell({ tag: "other_product", note: "", placedDaysAgo: 15, lines: [{ sku: "HM-3000", title: "Stand mixer HM-3000", unitMinor: 24900, shipped: [{ daysAgo: 14, batchCode: "S-0412" }] }], payment: "reference", truth: [] });
-    // A PayPal payment for the mixer with no order in the store's export.
+    await sell({ tag: "other_product", note: "", placedDaysAgo: 21, lines: [{ sku: "PL-80", title: "Platter PL-80", unitMinor: 8900, shipped: [{ daysAgo: 20 }] }], payment: "reference", truth: [] });
+    await sell({ tag: "other_product", note: "", placedDaysAgo: 15, lines: [{ sku: "CM-4120", title: "Dinner set CM-4120", unitMinor: 24900, shipped: [{ daysAgo: 14, batchCode: "S-0412" }] }], payment: "reference", truth: [] });
+    // A PayPal payment for the mug set with no order in the store's export.
     const stray = await io.pay({
       key: "orphan", amountMinor: 5900, currency: "USD", invoiceId: null, payer: { email: "walk.in@example.com", name: "Walk-in Buyer" },
-      at: daysAgo(30, 15), item: { sku: HM300.sku, title: HM300.title, quantity: 1, unitMinor: 5900 },
+      at: daysAgo(30, 15), item: { sku: CM412.sku, title: CM412.title, quantity: 1, unitMinor: 5900 },
     });
     captureIds.push(stray.captureId);
   } else {
@@ -317,21 +317,21 @@ export async function buildRecallScenario(io: ScenarioIo): Promise<ScenarioData>
 
   const window = (first: number, last: number) => ({ firstShippedAt: daysAgo(first).toISOString(), lastShippedAt: daysAgo(last).toISOString() });
   const batches = [
-    { batchCode: "B-2209", ...window(60, 41) },
+    { batchCode: "K-0711", ...window(60, 41) },
     { batchCode: AFFECTED_BATCH, ...window(40, 22) },
-    { batchCode: "B-2224", ...window(27, 2) },
-  ].map((b) => BatchImport.parse({ sku: HM300.sku, warehouse: "default", note: "synthetic", ...b }));
+    { batchCode: "K-0726", ...window(27, 2) },
+  ].map((b) => BatchImport.parse({ sku: CM412.sku, warehouse: "default", note: "synthetic", ...b }));
 
   return {
     dataset: RECALL_DATASET,
     mode,
     notice: recallNotice(now),
     catalogue: [
-      { sku: "HM-300", title: "Hand mixer HM-300" },
-      { sku: "HM-300-EU", title: "Hand mixer HM-300 (EU plug)" },
-      { sku: "HM-3000", title: "Stand mixer HM-3000" },
-      { sku: "KT-120", title: "Kettle KT-120" },
-      { sku: "BL-80", title: "Blender BL-80" },
+      { sku: "CM-412", title: "Mug set CM-412" },
+      { sku: "CM-412-GB", title: "Mug set CM-412 (gift box)" },
+      { sku: "CM-4120", title: "Dinner set CM-4120" },
+      { sku: "TP-120", title: "Teapot TP-120" },
+      { sku: "PL-80", title: "Platter PL-80" },
     ],
     batches,
     orders,
@@ -389,8 +389,8 @@ export async function loadRecallScenario(
       `insert into incidents (org_id, kind, title, description, created_by, created_at, updated_at)
        values ($1, 'recall', $2, $3, $4, $5, $5) returning id`,
       [
-        input.orgId, "HM-300 hand mixer: supplier recall of one production batch",
-        "The supplier has recalled one production batch of the HM-300 hand mixer because the speed controller can overheat. The notice is attached. We do not yet know which of our customers received that batch.",
+        input.orgId, "CM-412 mug set: supplier recall of one production batch",
+        "The supplier has recalled one production batch of the CM-412 mug set because its glaze can release lead into hot drinks. The notice is attached. We do not yet know which of our customers received that batch.",
         input.userId, now.toISOString(),
       ],
     );

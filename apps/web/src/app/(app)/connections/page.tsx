@@ -302,7 +302,7 @@ function ConnectStore({ reload }: { reload: () => void }) {
           />
           {kind === "shopify" ? (
             <>
-              <Field label="Store address" name="shopDomain" required placeholder="kitchen-co.myshopify.com" />
+              <Field label="Store address" name="shopDomain" required placeholder="emberline-ceramics.myshopify.com" />
               <div className="sm:col-span-2">
                 <Field
                   label="Admin API access token"

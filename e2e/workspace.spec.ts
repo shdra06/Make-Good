@@ -31,17 +31,17 @@ async function otherPerson(browser: Browser, name: string) {
 const nav = (page: Page, name: string) => page.getByRole("navigation", { name: "Main" }).getByRole("link", { name });
 
 test("an owner opens an incident, sets its rules by hand and attaches the notice", async ({ page }) => {
-  await signUp(page, "Priya", "Shah Kitchenware");
+  await signUp(page, "Priya", "Shah Pottery");
   await nav(page, "Incidents").click();
   await page.getByRole("link", { name: "Open an incident" }).click();
-  await page.getByLabel("Title", { exact: true }).fill("KT-120 kettle: batch K-77 recalled");
+  await page.getByLabel("Title", { exact: true }).fill("TP-120 teapot: batch K-77 recalled");
   await page.getByLabel("What you know so far").fill("The supplier phoned on Monday.");
   await page.getByRole("button", { name: "Open the incident" }).click();
 
   await expect(page).toHaveURL(/\/incidents\/[0-9a-f-]{36}\/notice$/);
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText("KT-120 kettle: batch K-77 recalled");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("TP-120 teapot: batch K-77 recalled");
 
-  await page.getByLabel("Affected product codes").fill("KT-120");
+  await page.getByLabel("Affected product codes").fill("TP-120");
   await page.getByLabel("Affected batch codes").fill("K-77");
   await page.getByRole("button", { name: "Save these rules" }).click();
   await expect(page.getByRole("heading", { name: "Rules in force, version 1" })).toBeVisible();
@@ -49,12 +49,12 @@ test("an owner opens an incident, sets its rules by hand and attaches the notice
   await page.getByLabel("Notice title").fill("Supplier recall notice K-77");
   await page
     .getByLabel("Notice text")
-    .fill("Kettle KT-120, batch K-77 only, may leak at the base. Customers should stop using it and will receive a full refund.");
+    .fill("Teapot TP-120, batch K-77 only, may leak at the base. Customers should stop using it and will receive a full refund.");
   await page.getByRole("button", { name: "Attach the notice" }).click();
   await expect(page.getByLabel("Supplier notice")).toContainText("batch K-77 only");
 
   await nav(page, "Dashboard").click();
-  await expect(page.getByRole("cell", { name: /KT-120 kettle/ })).toBeVisible();
+  await expect(page.getByRole("cell", { name: /TP-120 teapot/ })).toBeVisible();
 });
 
 test("an owner connects the simulator, adds a store and imports its orders", async ({ page }) => {
@@ -78,7 +78,7 @@ test("an owner connects the simulator, adds a store and imports its orders", asy
 });
 
 test("an owner adds a teammate, changes their role, and the teammate sees only what the role allows", async ({ page, browser }) => {
-  await signUp(page, "Lena", "Lena Kitchen");
+  await signUp(page, "Lena", "Lena Ceramics");
   const mate = await otherPerson(browser, "Tomas");
 
   await nav(page, "Team").click();
@@ -91,7 +91,7 @@ test("an owner adds a teammate, changes their role, and the teammate sees only w
 
   // Tomas opens the emailed link and accepts; he lands in Lena's workspace.
   await mate.page.goto(await linkFor(mate.email, "invite"));
-  await expect(mate.page.getByRole("heading", { name: "Join Lena Kitchen" })).toBeVisible();
+  await expect(mate.page.getByRole("heading", { name: "Join Lena Ceramics" })).toBeVisible();
   await mate.page.getByRole("button", { name: "Accept and open the workspace" }).click();
   await expect(mate.page).toHaveURL(/\/dashboard$/);
   await expect(mate.page.getByLabel("Workspace")).toHaveValue(/.+/);
@@ -122,7 +122,7 @@ test("an owner adds a teammate, changes their role, and the teammate sees only w
   // The teammate's own workspace is theirs; Lena's is listed second. Check what a viewer sees there.
   const m = mate.page;
   await m.reload();
-  await m.getByLabel("Workspace").selectOption({ label: "Lena Kitchen" });
+  await m.getByLabel("Workspace").selectOption({ label: "Lena Ceramics" });
   await expect(m.getByText("Viewer", { exact: true })).toBeVisible();
   await nav(m, "Settings").click();
   await expect(m.getByText("Only an owner or admin can change settings.")).toBeVisible();
@@ -132,7 +132,7 @@ test("an owner adds a teammate, changes their role, and the teammate sees only w
   await expect(m.getByText("Only an owner or admin can change the team.")).toBeVisible();
   const lenaOrg = await m.evaluate(async () => {
     const me = await (await fetch("/api/me")).json();
-    return me.organisations.find((o: { name: string }) => o.name === "Lena Kitchen")?.orgId as string | undefined;
+    return me.organisations.find((o: { name: string }) => o.name === "Lena Ceramics")?.orgId as string | undefined;
   });
   expect(lenaOrg).toBeTruthy();
   const settings = await m.evaluate(

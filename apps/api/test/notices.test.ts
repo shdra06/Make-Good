@@ -16,7 +16,7 @@ const outbox = () => fs.mkdtempSync(path.join(os.tmpdir(), "mg-outbox-"));
 test("a paid customer is told once, only after PayPal confirmed, with PayPal's reference and a test label", async () => {
   const s = await scenario();
   const dir = outbox();
-  const mailer = new FileMailer({ dir, from: "Kitchen Co <notices@example.com>" });
+  const mailer = new FileMailer({ dir, from: "Emberline Ceramics <notices@example.com>" });
   const a = await s.sell();
   await s.sell({ batchCode: "LOT-23A" }); // not affected: never emailed
   await s.sync();
@@ -48,7 +48,7 @@ test("a paid customer is told once, only after PayPal confirmed, with PayPal's r
   const files = fs.readdirSync(dir);
   assert.equal(files.length, 1, "one file for one email");
   const eml = fs.readFileSync(path.join(dir, files[0]!), "utf8");
-  assert.match(eml, new RegExp(`^From: Kitchen Co <notices@example.com>\\r\\nTo: ${a.email.replace(/[.+]/g, "\\$&")}\\r\\n`));
+  assert.match(eml, new RegExp(`^From: Emberline Ceramics <notices@example.com>\\r\\nTo: ${a.email.replace(/[.+]/g, "\\$&")}\\r\\n`));
   assert.equal(notice!.delivery_ref, `outbox/${files[0]}`);
 
   const [trail] = await s.db.query<{ n: number }>("select count(*)::int as n from audit_events where action = 'notice.payment_sent'");
@@ -58,7 +58,7 @@ test("a paid customer is told once, only after PayPal confirmed, with PayPal's r
 test("a held customer is emailed a one-time link; their answer is evidence only", async () => {
   const s = await scenario();
   const dir = outbox();
-  const mailer = new FileMailer({ dir, from: "Kitchen Co <notices@example.com>" });
+  const mailer = new FileMailer({ dir, from: "Emberline Ceramics <notices@example.com>" });
   const a = await s.sell({ batchCode: null });
   await s.sync();
   const incidentId = await s.incident();
@@ -92,7 +92,7 @@ test("Resend: an email is sent with its own ID as the idempotency key, and a ref
     calls.push({ url: String(url), init: init! });
     return new Response(JSON.stringify(status === 200 ? { id: "re_123" } : { name: "validation_error", message: "domain not verified" }), { status });
   };
-  const mailer = new ResendMailer({ apiKey: "re_test_key", from: "Kitchen Co <notices@example.com>", fetchImpl: fakeFetch });
+  const mailer = new ResendMailer({ apiKey: "re_test_key", from: "Emberline Ceramics <notices@example.com>", fetchImpl: fakeFetch });
   const sent = await mailer.send({ id: "email-1", to: "maya@example.com\r\nBcc: x@evil.example", subject: "Your refund", text: "Hello", at: new Date() });
   assert.equal(sent.ref, "resend/re_123");
   assert.equal(calls[0]!.url, "https://api.resend.com/emails");

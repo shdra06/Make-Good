@@ -55,7 +55,7 @@ async function harness(ai: EvidenceAi | null = null) {
   };
 
   await ok(post("/api/auth/register", { email: "ada@example.com", password: "correct horse battery", name: "Ada" }));
-  const org: string = (await ok(post("/api/orgs", { name: "Kitchen Co" }))).id;
+  const org: string = (await ok(post("/api/orgs", { name: "Emberline Ceramics" }))).id;
   await ok(post(`/api/orgs/${org}/paypal/simulator`));
   const seeded = await ok(post(`/api/orgs/${org}/demo/recall-scenario`));
   const sim = await container.connections.simulatorFor(org);
@@ -79,7 +79,7 @@ async function harness(ai: EvidenceAi | null = null) {
   return { db, clock, container, sim, org, api, inc, seeded, get, post, ok, settle, rows };
 }
 
-const SCOPE = { type: "product", skus: ["HM-300", "HM-300-EU"], batchCodes: ["B-2217"] };
+const SCOPE = { type: "product", skus: ["CM-412", "CM-412-GB"], batchCodes: ["K-0719"] };
 
 test("the recall case, from the supplier's notice to PayPal's confirmation", async () => {
   const h = await harness();
@@ -97,12 +97,12 @@ test("the recall case, from the supplier's notice to PayPal's confirmation", asy
   assert.deepEqual(read.output.proposedScope, SCOPE);
   assert.deepEqual(read.output.proposedCompensation, { type: "full_refund" });
   const product = (code: string) => read.output.products.find((p: any) => p.code === code);
-  assert.equal(product("HM-3000").included, false, "the stand mixer is named as not affected");
-  assert.deepEqual(read.output.batchCodes.map((b: any) => [b.code, b.affected]), [["B-2217", true], ["B-2209", false], ["B-2224", false]]);
-  assert.ok(evidence.documents[0].body.includes(product("HM-300-EU").quote), "each field quotes the notice word for word");
+  assert.equal(product("CM-4120").included, false, "the dinner set is named as not affected");
+  assert.deepEqual(read.output.batchCodes.map((b: any) => [b.code, b.affected]), [["K-0719", true], ["K-0711", false], ["K-0726", false]]);
+  assert.ok(evidence.documents[0].body.includes(product("CM-412-GB").quote), "each field quotes the notice word for word");
   assert.equal((await h.get(`${h.inc}/recovery-map`)).body.rule, null, "reading a notice applies nothing");
 
-  const tooWide = await h.post(`${h.inc}/extractions/${read.id}/accept`, { scope: { ...SCOPE, batchCodes: ["B-2217", "B-2218"] }, compensation: { type: "full_refund" } });
+  const tooWide = await h.post(`${h.inc}/extractions/${read.id}/accept`, { scope: { ...SCOPE, batchCodes: ["K-0719", "K-0720"] }, compensation: { type: "full_refund" } });
   assert.equal(tooWide.status, 422, "a batch the notice never mentions cannot be saved as coming from it");
   assert.equal((await h.ok(h.post(`${h.inc}/extractions/${read.id}/accept`, { scope: SCOPE, compensation: { type: "full_refund" } }))).version, 1);
 
@@ -151,14 +151,14 @@ test("the recall case, from the supplier's notice to PayPal's confirmation", asy
   const suggested = await h.ok(h.post(`${h.inc}/aliases/suggest`, { withAi: false }));
   const alias = (text: string) => suggested.aliases.find((a: any) => a.alias === text);
   assert.deepEqual(suggested.aliases.map((a: any) => [a.alias, a.status]).sort(), [
-    ["HM-3000", "suggested"], ["HM300", "suggested"], ["Kestrel hand mixer HM-300 white", "suggested"],
+    ["CM-4120", "suggested"], ["CM412", "suggested"], ["Wrenfield mug set CM-412 white", "suggested"],
   ]);
-  assert.match(alias("HM-3000").reason, /extra characters/);
-  assert.deepEqual(alias("HM-3000").batchCodes, ["B-2217", "S-0412"], "the look-alike even carries the recalled batch number: a trap");
+  assert.match(alias("CM-4120").reason, /extra characters/);
+  assert.deepEqual(alias("CM-4120").batchCodes, ["K-0719", "S-0412"], "the look-alike even carries the recalled batch number: a trap");
   assert.equal((await h.ok(h.post(`${h.inc}/match`))).byDecision.ready_for_approval, 10, "a suggestion changes nothing");
-  await h.ok(h.post(`${h.api}/aliases/${alias("HM300").id}/decision`, { decision: "confirm" }));
-  await h.ok(h.post(`${h.api}/aliases/${alias("Kestrel hand mixer HM-300 white").id}/decision`, { decision: "confirm" }));
-  await h.ok(h.post(`${h.api}/aliases/${alias("HM-3000").id}/decision`, { decision: "reject" }));
+  await h.ok(h.post(`${h.api}/aliases/${alias("CM412").id}/decision`, { decision: "confirm" }));
+  await h.ok(h.post(`${h.api}/aliases/${alias("Wrenfield mug set CM-412 white").id}/decision`, { decision: "confirm" }));
+  await h.ok(h.post(`${h.api}/aliases/${alias("CM-4120").id}/decision`, { decision: "reject" }));
   assert.equal((await h.ok(h.post(`${h.inc}/match`))).byDecision.ready_for_approval, 12);
   const after = await h.ok(h.get(`${h.inc}/evaluation`));
   assert.deepEqual(
@@ -193,7 +193,7 @@ test("the recall case, from the supplier's notice to PayPal's confirmation", asy
   // ---- 6. People settle what the records cannot ----
   const supported = await h.rows("&eligibility=supported");
   const confirmed = await h.ok(h.post(`${h.inc}/candidates/decide`, {
-    candidateIds: supported.map((r) => r.id), decision: "confirm", basis: "merchant_records_checked", note: "warehouse pick sheets for that week show B-2217 only",
+    candidateIds: supported.map((r) => r.id), decision: "confirm", basis: "merchant_records_checked", note: "warehouse pick sheets for that week show K-0719 only",
   }));
   assert.equal(confirmed.changed, 2);
 
@@ -222,7 +222,7 @@ test("the recall case, from the supplier's notice to PayPal's confirmation", asy
   // Left out: two mixed-stock orders, one with no shipping record, one guessed payment, one payment PayPal does not know,
   // one payment with no order; the card payer; and the returned, already refunded and disputed orders.
   assert.deepEqual(preview.notIncluded, { waiting_for_confirmation: 6, needs_manual_handling: 1, excluded: 3 });
-  const batch = await h.ok(h.post(`${h.inc}/batches`, { name: "HM-300 recall, first payment list" }));
+  const batch = await h.ok(h.post(`${h.inc}/batches`, { name: "CM-412 recall, first payment list" }));
   const manifest = await h.ok(h.get(`${h.api}/batches/${batch.id}/manifest`));
   assert.deepEqual([manifest.version, manifest.status, manifest.content.items.length, manifest.content.environment], [1, "current", 16, "simulator"]);
   assert.equal(manifest.content.items.reduce((a: number, i: any) => a + i.amountMinor, 0), provenTotal + 4 * 5900);
@@ -325,7 +325,7 @@ test("the recall case, from the supplier's notice to PayPal's confirmation", asy
 
 test("a field survives only if it quotes the document and its value is inside the quote", () => {
   const notice = recallNotice(new Date("2026-11-11T09:00:00Z")).body;
-  const catalogue = ["BL-80", " hm-300", "HM-300", "HM-300-EU", "HM-3000", "HM300", "KT-120"];
+  const catalogue = ["PL-80", " cm-412", "CM-412", "CM-412-GB", "CM-4120", "CM412", "TP-120"];
   const honest = checkExtraction(notice, readWithPatternRules(notice, catalogue), catalogue);
   assert.deepEqual(honest.dropped, []);
   assert.deepEqual(honest.proposedScope, SCOPE);
@@ -334,17 +334,17 @@ test("a field survives only if it quotes the document and its value is inside th
   // A reader that invents a batch, misquotes, or puts a code in a sentence that does not contain it.
   const invented = checkExtraction(notice, {
     products: [
-      { code: "HM-300", name: "hand mixer", included: true, quote: "Product: HM-300 hand mixer (catalogue code HM-300)." },
-      { code: "KT-120", name: "kettle", included: true, quote: "Product: HM-300 hand mixer (catalogue code HM-300)." },
+      { code: "CM-412", name: "mug set", included: true, quote: "Product: CM-412 mug set (catalogue code CM-412)." },
+      { code: "TP-120", name: "teapot", included: true, quote: "Product: CM-412 mug set (catalogue code CM-412)." },
     ],
     batchCodes: [
-      { code: "B-2217", affected: true, quote: "Affected production batch: B-2217 only." },
-      { code: "B-2218", affected: true, quote: "Batch B-2218 is also affected and must be recalled." },
+      { code: "K-0719", affected: true, quote: "Affected production batch: K-0719 only." },
+      { code: "K-0720", affected: true, quote: "Batch K-0720 is also affected and must be recalled." },
     ],
     dates: [], remedy: [{ kind: "full_refund", quote: "Customers are entitled to a full refund and compensation." }], fault: [], notStated: [],
   }, catalogue);
-  assert.deepEqual(invented.dropped.map((d) => [d.field, d.value]), [["product", "KT-120"], ["batch", "B-2218"], ["remedy", "full_refund"]]);
-  assert.deepEqual(invented.proposedScope, { type: "product", skus: ["HM-300"], batchCodes: ["B-2217"] });
+  assert.deepEqual(invented.dropped.map((d) => [d.field, d.value]), [["product", "TP-120"], ["batch", "K-0720"], ["remedy", "full_refund"]]);
+  assert.deepEqual(invented.proposedScope, { type: "product", skus: ["CM-412"], batchCodes: ["K-0719"] });
   assert.equal(invented.proposedCompensation, null, "an unquoted remedy proposes nothing");
 });
 
@@ -359,12 +359,12 @@ test("the AI's output is checked like any other reader's, and it can decide noth
       calls.push("readNotice");
       return {
         products: [
-          { code: "HM-300", name: "hand mixer", included: true, quote: "Product: HM-300 hand mixer (catalogue code HM-300)." },
-          { code: "HM-300-EU", name: "", included: true, quote: "The EU-plug version, sold as HM-300-EU, is the same unit and is included in this recall." },
+          { code: "CM-412", name: "mug set", included: true, quote: "Product: CM-412 mug set (catalogue code CM-412)." },
+          { code: "CM-412-GB", name: "", included: true, quote: "The gift-boxed version, sold as CM-412-GB, is the same set and is included in this recall." },
         ],
         batchCodes: [
-          { code: "B-2217", affected: true, quote: "Affected production batch: B-2217 only." },
-          { code: "B-2224", affected: true, quote: "Batch B-2224 should be treated as affected as a precaution." },
+          { code: "K-0719", affected: true, quote: "Affected production batch: K-0719 only." },
+          { code: "K-0726", affected: true, quote: "Batch K-0726 should be treated as affected as a precaution." },
         ],
         dates: [], remedy: [], fault: [], notStated: ["How many units were in the batch."],
       };
@@ -374,10 +374,10 @@ test("the AI's output is checked like any other reader's, and it can decide noth
       return {
         opinions: candidates.map((c) => ({
           id: c.id,
-          verdict: c.alias === "HM-3000" ? "different_product" as const : "same_product" as const,
+          verdict: c.alias === "CM-4120" ? "different_product" as const : "same_product" as const,
           reason: "The title names the same model.",
           // For one of them the model "quotes" a title that is on no order line.
-          quotedTitle: c.alias === "HM300" ? "Hand mixer HM-300 original" : c.sampleTitles[0]!,
+          quotedTitle: c.alias === "CM412" ? "Mug set CM-412 original" : c.sampleTitles[0]!,
         })),
       };
     },
@@ -399,7 +399,7 @@ test("the AI's output is checked like any other reader's, and it can decide noth
 
   const read = await h.ok(h.post(`${h.inc}/documents/${h.seeded.documentId}/extract`, { method: "auto" }));
   assert.deepEqual([read.method, read.model], ["gemini", "stand-in-model"]);
-  assert.deepEqual(read.output.dropped.map((d: any) => d.value), ["B-2224"], "the batch the model made a sentence up for is dropped");
+  assert.deepEqual(read.output.dropped.map((d: any) => d.value), ["K-0726"], "the batch the model made a sentence up for is dropped");
   assert.deepEqual(read.output.proposedScope, SCOPE);
   assert.ok(notice.includes(read.output.batchCodes[0].quote));
   assert.equal((await h.ok(h.get(`${h.inc}/recovery-map`))).rule, null, "what the model read is a proposal: no rules exist until a person saves them");
@@ -409,9 +409,9 @@ test("the AI's output is checked like any other reader's, and it can decide noth
   const suggested = await h.ok(h.post(`${h.inc}/aliases/suggest`, { withAi: true }));
   assert.equal(suggested.aiUsed, true);
   const alias = (text: string) => suggested.aliases.find((a: any) => a.alias === text);
-  assert.equal(alias("HM300").ai, null, "an opinion that quotes a title no order line has is thrown away");
-  assert.deepEqual([alias("HM-3000").ai.verdict, alias("HM-3000").ai.model], ["different_product", "stand-in-model"]);
-  assert.equal(alias("Kestrel hand mixer HM-300 white").ai.verdict, "same_product");
+  assert.equal(alias("CM412").ai, null, "an opinion that quotes a title no order line has is thrown away");
+  assert.deepEqual([alias("CM-4120").ai.verdict, alias("CM-4120").ai.model], ["different_product", "stand-in-model"]);
+  assert.equal(alias("Wrenfield mug set CM-412 white").ai.verdict, "same_product");
   assert.ok(suggested.aliases.every((a: any) => a.status === "suggested"), "the model's opinion confirms nothing");
   assert.equal((await h.ok(h.post(`${h.inc}/match`))).byDecision.ready_for_approval, 10, "and matches nobody");
 

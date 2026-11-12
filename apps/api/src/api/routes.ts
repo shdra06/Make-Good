@@ -875,7 +875,7 @@ export function buildApp(c: Container): Router {
     handler: async ({ org, user }) => seedDemoData({ db: c.db, clock: c.clock, connections: c.connections }, { orgId: org.orgId, userId: user.id }),
   });
   route({
-    method: "POST", path: "/api/orgs/:orgId/demo/recall-scenario", summary: "Load the HM-300 batch-recall case: untidy synthetic records with known answers (simulator connections only)", tag: "Demo",
+    method: "POST", path: "/api/orgs/:orgId/demo/recall-scenario", summary: "Load the CM-412 batch-recall case: untidy synthetic records with known answers (simulator connections only)", tag: "Demo",
     auth: { permission: "org.manage" }, params: OrgParams,
     handler: async ({ org, user }) => seedRecallScenario({ db: c.db, clock: c.clock, connections: c.connections }, { orgId: org.orgId, userId: user.id }),
   });

@@ -89,7 +89,7 @@ All under `apps/api/src/modules`, plus cross-cutting code in `src/platform`.
 | `detection` | Monitoring detectors | Built and tested |
 | `fx` | Reference rates, exposure, estimates | Built and tested, live rates verified |
 | `reporting` | Read queries for the screens | Built and tested through the API |
-| `demo` | Sample data on the simulator, and the HM-300 recall case with known answers (simulator or sandbox) | Built and tested |
+| `demo` | Sample data on the simulator, and the CM-412 recall case with known answers (simulator or sandbox) | Built and tested |
 | `recovery` | The Recovery Map, policy pricing, look-alike product codes | Built and tested |
 | `evidence` | Incident documents, reading them into checked fields, product-code aliases, explanations. Gemini is called only from `evidence/gemini.ts`; the prompts are in `evidence/ai.ts` | Built. Pattern-rule reader tested. Gemini verified against the real API (`npm run ai:verify`) |
 | `evaluation` | Accuracy against known answers for synthetic data | Built and tested |
@@ -182,7 +182,7 @@ Three things hold everywhere:
 
 Buyers shown not to be affected are stored too, with the record that cleared them, so a merchant can see why someone is left out. The older ladder (`classification`) is still stored for existing reports; it never drives a payment.
 
-A product code written differently on an order ("HM300" for HM-300, or no code and only a title) is not matched on a guess. Plain text rules find such lines and list them. They join the incident only after a person confirms the alias.
+A product code written differently on an order ("CM412" for CM-412, or no code and only a title) is not matched on a guess. Plain text rules find such lines and list them. They join the incident only after a person confirms the alias.
 
 ## 6a. What an approval covers: the manifest
 

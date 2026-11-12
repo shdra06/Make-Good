@@ -118,7 +118,7 @@ export default function Home() {
                 />
                 <h2 className="relative text-3xl font-semibold tracking-tight text-balance sm:text-4xl">See a whole recall in two minutes</h2>
                 <p className="relative mx-auto mt-3 max-w-xl text-muted-foreground">
-                  The demo opens a shop with a recalled hand mixer, 32 orders and a PayPal simulator. Walk it from the notice to confirmed refunds.
+                  The demo opens a shop with a recalled mug set, 32 orders and a PayPal simulator. Walk it from the notice to confirmed refunds.
                 </p>
                 <div className="relative mt-8 flex flex-wrap justify-center gap-3">
                   <DemoButton />
