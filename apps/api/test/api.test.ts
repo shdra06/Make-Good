@@ -560,3 +560,17 @@ test("row-level security: inside one shop's request, the database itself hides a
   // Outside a scope (sign-in, the job worker), nothing changes.
   assert.ok((await h.db.query("select id from organisations")).length >= 2);
 });
+
+test("row-level security rules never cast an empty shop setting to a uuid", async () => {
+  const h = await harness();
+  await h.person("Ada", "Kitchen Co");
+  // Real PostgreSQL may evaluate either side of an OR first, so every cast must go through nullif.
+  const policies = await h.db.query<{ tablename: string; qual: string }>("select tablename, qual from pg_policies where policyname = 'org_isolation'");
+  assert.ok(policies.length > 20);
+  const unsafe = policies.filter((p) => /current_setting\('app\.org_id'::text, true\)\)?::uuid/.test(p.qual.replace(/nullif\([^)]*\)\)?/g, "")));
+  assert.deepEqual(unsafe.map((p) => p.tablename), []);
+  // A connection that once ran a shop's transaction keeps app.org_id as ''. Unscoped reads must still work.
+  await h.db.query("select set_config('app.org_id', '', false)");
+  assert.ok((await h.db.query("select id from organisations")).length >= 1);
+  assert.equal((await h.db.query<{ v: string | null }>("select nullif(current_setting('app.org_id', true), '')::uuid as v"))[0]!.v, null);
+});
