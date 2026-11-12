@@ -12,6 +12,9 @@ export const CUSTOMER_DATA = [
   { table: "candidates", seal: ["customer_email", "customer_name"], index: [], json: [] },
   { table: "customer_notices", seal: ["to_email", "body"], index: [], json: [] },
   { table: "provider_events", seal: [], index: [], json: ["payload"] },
+  { table: "claims", seal: ["claimant_email", "claimant_name", "statement"], index: ["claimant_email_normalized"], json: ["declared"] },
+  { table: "claim_evidence", seal: ["original_name", "content"], index: [], json: [] },
+  { table: "claim_events", seal: ["body"], index: [], json: [] },
 ] as const;
 
 export async function sealExistingCustomerData(db: Db, batch = 500): Promise<number> {

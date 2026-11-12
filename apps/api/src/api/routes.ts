@@ -5,6 +5,7 @@ import { z } from "zod";
 import type { Container } from "../container.ts";
 import { audit } from "../platform/audit.ts";
 import { exportWorkspace } from "../platform/export.ts";
+import { addEvidence, ClaimDecision, claimDetail, claimFile, claimForm, claimStatus, decideClaim, emailClaimDecision, listClaims, NewClaim, NewEvidence, setClaimsOpen, submitClaim } from "../modules/incidents/claims.ts";
 import { acceptInvitation, describeInvitation, invite, listInvitations, NewInvitation, revokeInvitation } from "../modules/identity/invitations.ts";
 import { DAY } from "../platform/clock.ts";
 import { ConflictError, NotConfiguredError, NotFoundError, ValidationError } from "../platform/errors.ts";
@@ -719,6 +720,75 @@ export function buildApp(c: Container): Router {
       reply.header("Content-Disposition", `attachment; filename="make-good-${org.slug}-${c.clock.now().toISOString().slice(0, 10)}.json"`);
       return data;
     },
+  });
+
+  // ---------- customer claims ----------
+
+  route({
+    method: "POST", path: "/api/orgs/:orgId/incidents/:incidentId/claims/open", summary: "Open or close the public claim form for an incident", tag: "Claims",
+    auth: { permission: "incident.write" }, params: OrgParams.extend({ incidentId: uuid }),
+    body: z.object({ open: z.boolean(), instructions: z.string().trim().max(2000).optional() }),
+    handler: async ({ body, params, org, user }) => {
+      const out = await setClaimsOpen(c.deps, { orgId: org.orgId, incidentId: params.incidentId, userId: user.id, ...body });
+      return { ...out, url: `${c.config.publicUrl}/claim/${out.slug}` };
+    },
+  });
+  route({
+    method: "GET", path: "/api/orgs/:orgId/incidents/:incidentId/claims", summary: "Claims sent by customers for an incident", tag: "Claims",
+    auth: { permission: "claim.review" }, params: OrgParams.extend({ incidentId: uuid }),
+    handler: async ({ params, org }) => {
+      const [inc] = await c.db.query<{ claims_open: boolean; public_slug: string | null; claim_instructions: string | null }>(
+        "select claims_open, public_slug, claim_instructions from incidents where org_id = $1 and id = $2",
+        [org.orgId, params.incidentId],
+      );
+      if (!inc) throw new NotFoundError("Incident");
+      return {
+        open: inc.claims_open, url: inc.public_slug ? `${c.config.publicUrl}/claim/${inc.public_slug}` : null, instructions: inc.claim_instructions,
+        claims: await listClaims(c.db, org.orgId, params.incidentId),
+      };
+    },
+  });
+  route({
+    method: "GET", path: "/api/orgs/:orgId/claims/:claimId", summary: "One claim, its files, its history and the orders it may match", tag: "Claims",
+    auth: { permission: "claim.review" }, params: OrgParams.extend({ claimId: uuid }),
+    handler: async ({ params, org }) => claimDetail(c.db, org.orgId, params.claimId),
+  });
+  route({
+    method: "GET", path: "/api/orgs/:orgId/claims/:claimId/files/:fileId", summary: "A file a customer sent with a claim", tag: "Claims",
+    auth: { permission: "claim.review" }, params: OrgParams.extend({ claimId: uuid, fileId: uuid }),
+    handler: async ({ params, org, reply }) => {
+      const file = await claimFile(c.db, org.orgId, params.claimId, params.fileId);
+      return reply.type(file.mime).header("Content-Disposition", "inline").send(file.bytes);
+    },
+  });
+  route({
+    method: "POST", path: "/api/orgs/:orgId/claims/:claimId/decision", summary: "Approve, reject, or ask the customer for more evidence", tag: "Claims",
+    auth: { permission: "claim.review" }, params: OrgParams.extend({ claimId: uuid }), body: ClaimDecision,
+    handler: async ({ body, params, org, user }) => {
+      const out = await decideClaim(c.deps, c.mailer, { ...body, orgId: org.orgId, claimId: params.claimId, userId: user.id, publicUrl: c.config.publicUrl });
+      await emailClaimDecision(c.deps, c.mailer, { orgId: org.orgId, claimId: params.claimId });
+      return out;
+    },
+  });
+  route({
+    method: "GET", path: "/api/public/claims/form/:slug", summary: "The public claim form of an incident", tag: "Public", auth: "public",
+    params: z.object({ slug: z.string().min(4).max(40) }), rateLimit: { max: 60, windowMs: 10 * 60_000 },
+    handler: async ({ params }) => claimForm(c.deps, params.slug),
+  });
+  route({
+    method: "POST", path: "/api/public/claims/form/:slug", summary: "Send a claim. Returns a private status token.", tag: "Public", auth: "public",
+    params: z.object({ slug: z.string().min(4).max(40) }), body: NewClaim, rateLimit: { max: 5, windowMs: 60 * 60_000 },
+    handler: async ({ body, params, ip }) => submitClaim(c.deps, c.mailer, { ...body, slug: params.slug, ip, publicUrl: c.config.publicUrl }),
+  });
+  route({
+    method: "GET", path: "/api/public/claims/status/:token", summary: "A customer's view of their claim", tag: "Public", auth: "public",
+    params: z.object({ token: z.string().min(20).max(80) }), rateLimit: { max: 60, windowMs: 10 * 60_000 },
+    handler: async ({ params }) => claimStatus(c.deps, params.token),
+  });
+  route({
+    method: "POST", path: "/api/public/claims/status/:token/files", summary: "Add a photo or PDF to a claim (base64, at most 4 MB)", tag: "Public", auth: "public",
+    params: z.object({ token: z.string().min(20).max(80) }), body: NewEvidence, rateLimit: { max: 20, windowMs: 60 * 60_000 },
+    handler: async ({ body, params }) => addEvidence(c.deps, { ...body, token: params.token }),
   });
 
   // ---------- invitations ----------

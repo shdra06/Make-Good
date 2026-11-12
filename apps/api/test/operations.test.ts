@@ -7,8 +7,9 @@ import { createContainer } from "../src/container.ts";
 import { FakeClock } from "../src/platform/clock.ts";
 import { loadConfig } from "../src/platform/config.ts";
 import { testDb } from "./helpers.ts";
+import type { Email, Mailer } from "../src/modules/notify/mailer.ts";
 
-async function setup(env: Record<string, string> = {}) {
+async function setup(env: Record<string, string> = {}, mailer: Mailer | null = null) {
   const posted: unknown[] = [];
   const fakeFetch: typeof fetch = async (url, init) => {
     if (String(url).startsWith("https://hooks.example")) posted.push(JSON.parse(String(init?.body)));
@@ -17,7 +18,7 @@ async function setup(env: Record<string, string> = {}) {
   const db = await testDb();
   const clock = new FakeClock("2026-11-12T09:00:00.000Z");
   const config = loadConfig({ NODE_ENV: "test", LOG_LEVEL: "silent", PUBLIC_URL: "http://localhost:4000", ...env }, { readEnvFiles: false });
-  const container = await createContainer(config, { db, clock, passwordCost: { N: 1024, r: 8, p: 1 }, fetchImpl: fakeFetch, mailer: null });
+  const container = await createContainer(config, { db, clock, passwordCost: { N: 1024, r: 8, p: 1 }, fetchImpl: fakeFetch, mailer });
   const { app } = buildApp(container);
   await app.ready();
   const client = () => {
@@ -29,7 +30,13 @@ async function setup(env: Record<string, string> = {}) {
       });
       const set = res.headers["set-cookie"];
       if (set) cookie = String(Array.isArray(set) ? set[0] : set).split(";")[0]!;
-      return { status: res.statusCode, body: res.body ? JSON.parse(res.body) : null, headers: res.headers };
+      let parsed: any = null;
+      try {
+        parsed = res.body ? JSON.parse(res.body) : null;
+      } catch {
+        parsed = res.rawPayload;
+      }
+      return { status: res.statusCode, body: parsed, headers: res.headers };
     };
   };
   const owner = async (name: string, shop: string) => {
@@ -102,4 +109,74 @@ test("a workspace can switch the AI off", async () => {
   assert.equal(off.body.aiEnabled, false);
   const me = await ada.call("GET", "/api/me");
   assert.equal(me.body.organisations[0].settings.aiEnabled, false);
+});
+
+// A real 1x1 PNG, and a file that only pretends to be one.
+const PNG = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
+const FAKE = Buffer.from("<script>alert(1)</script>").toString("base64");
+
+test("claims: a customer sends one with a photo, staff see the matching order and decide, the customer is told", async () => {
+  const sent: Email[] = [];
+  const mailer: Mailer = { transport: "file", send: async (e) => (sent.push(e), { ref: `mem/${e.id}` }) };
+  const s = await setup({}, mailer);
+  const ada = await s.owner("ada", "Kitchen Co");
+  const store = (await ada.call("POST", `/api/orgs/${ada.org}/stores`, { name: "Main shop" })).body.id;
+  await ada.call("POST", `/api/orgs/${ada.org}/stores/${store}/orders`, {
+    orders: [{ externalId: "1001", orderNumber: "1001", placedAt: "2026-10-01T10:00:00Z", currency: "USD", customer: { email: "maya@example.com", name: "Maya Chen" },
+      paymentMethod: "paypal", lines: [{ externalId: "1", sku: "HM-300", title: "Hand mixer", quantity: 1, unitPrice: "59.00" }], total: "59.00" }],
+  });
+  const incident = (await ada.call("POST", `/api/orgs/${ada.org}/incidents`, { kind: "recall", title: "HM-300 recall" })).body.id;
+
+  const opened = await ada.call("POST", `/api/orgs/${ada.org}/incidents/${incident}/claims/open`, { open: true, instructions: "Send a photo of the label." });
+  assert.equal(opened.status, 200);
+  const slug = opened.body.slug as string;
+  assert.match(opened.body.url, new RegExp(`/claim/${slug}$`));
+
+  const anon = (await s.owner("zz", "Other")).call; // any browser; the public routes need no account
+  const form = await anon("GET", `/api/public/claims/form/${slug}`);
+  assert.deepEqual([form.body.shop, form.body.title, form.body.instructions], ["Kitchen Co", "HM-300 recall", "Send a photo of the label."]);
+  assert.equal((await anon("POST", `/api/public/claims/form/${slug}`, { name: "Maya", email: "maya@example.com", statement: "short" })).status, 422);
+  const claim = await anon("POST", `/api/public/claims/form/${slug}`, {
+    name: "Maya Chen", email: "Maya@Example.com", orderNumber: "1001", batchCode: "B-2217", statement: "I bought the HM-300 mixer in October and it has batch B-2217.",
+  });
+  assert.equal(claim.status, 200);
+  const token = claim.body.token as string;
+  assert.match(sent.at(-1)!.text, new RegExp(`/claim/status/${token}`), "the customer is emailed a private status link");
+
+  const files = `/api/public/claims/status/${token}/files`;
+  assert.equal((await anon("POST", files, { kind: "product_label", name: "evil.png", data: FAKE })).status, 422, "the content decides the type, not the name");
+  assert.deepEqual((await anon("POST", files, { kind: "product_label", name: "label.png", data: PNG })).body, { added: true, duplicate: false });
+  assert.equal((await anon("POST", files, { kind: "product_label", data: PNG })).body.duplicate, true, "the same file is kept once");
+
+  const list = await ada.call("GET", `/api/orgs/${ada.org}/incidents/${incident}/claims`);
+  assert.equal(list.body.claims.length, 1);
+  const id = list.body.claims[0].id as string;
+  const detail = await ada.call("GET", `/api/orgs/${ada.org}/claims/${id}`);
+  assert.deepEqual([detail.body.claimant_name, detail.body.declared.orderNumber, detail.body.files.length], ["Maya Chen", "1001", 1]);
+  assert.equal(detail.body.matches[0].order_number, "1001");
+  assert.equal(detail.body.matches[0].how, "order number");
+  const file = await ada.call("GET", `/api/orgs/${ada.org}/claims/${id}/files/${detail.body.files[0].id}`);
+  assert.equal(file.status, 200);
+  assert.equal(file.headers["content-type"], "image/png");
+  assert.equal(Buffer.from(file.body).toString("base64"), PNG, "staff get the exact file back");
+  const [stored] = await s.db.query<{ sealed: boolean }>("select content like 'pii1:%' and claimant_name is not null as sealed from claim_evidence e join claims c on c.id = e.claim_id where c.id = $1", [id]);
+  const [raw] = await s.db.query<{ n: boolean }>("select claimant_name like 'pii1:%' as n from claims where id = $1", [id]);
+  assert.ok(stored!.sealed && raw!.n, "the photo and the name are stored encrypted");
+
+  const bo = await s.owner("bo", "Garden Ltd");
+  assert.equal((await bo.call("GET", `/api/orgs/${ada.org}/claims/${id}`)).status, 404, "another shop cannot read it");
+
+  assert.equal((await ada.call("POST", `/api/orgs/${ada.org}/claims/${id}/decision`, { decision: "needs_evidence" })).status, 422, "a request must say why");
+  await ada.call("POST", `/api/orgs/${ada.org}/claims/${id}/decision`, { decision: "needs_evidence", note: "Please add a photo of your receipt." });
+  assert.match(sent.at(-1)!.text, /Please add a photo of your receipt/);
+  const status = await anon("GET", `/api/public/claims/status/${token}`);
+  assert.equal(status.body.status, "needs_evidence");
+  assert.ok(status.body.events.some((e: { body: string }) => /receipt/.test(e.body)));
+  const decided = await ada.call("POST", `/api/orgs/${ada.org}/claims/${id}/decision`, { decision: "approve" });
+  assert.equal(decided.body.status, "approved");
+  assert.match(sent.at(-1)!.text, /accepted/);
+  assert.equal((await anon("POST", files, { kind: "receipt", data: PNG.replace("A", "B") })).status, 409, "no files after a decision");
+
+  await ada.call("POST", `/api/orgs/${ada.org}/incidents/${incident}/claims/open`, { open: false });
+  assert.equal((await anon("GET", `/api/public/claims/form/${slug}`)).status, 404, "a closed form is gone");
 });

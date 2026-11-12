@@ -101,7 +101,8 @@ export function createRouter(input: { config: Config; identity: IdentityDeps; no
   const { config, identity } = input;
   const app = Fastify({
     logger: config.logLevel === "silent" ? false : { level: config.logLevel },
-    bodyLimit: 5 * 1024 * 1024,
+    // A 4 MB claim photo is about 5.6 MB as base64 JSON.
+    bodyLimit: 8 * 1024 * 1024,
     trustProxy: true,
   });
   const registry: Registered[] = [];
