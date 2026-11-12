@@ -27,6 +27,10 @@
   --hold: oklch(0.62 0.14 70);
   --info: oklch(0.5 0.14 255);
   --sidebar: oklch(0.975 0.003 95);
+  /* Bryntum's theme uses light-dark(). The production CSS build rewrites
+     light-dark() into helper variables that only a color-scheme rule sets;
+     without one, every timeline bar is transparent. */
+  color-scheme: light;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -52,6 +56,7 @@
     --hold: oklch(0.78 0.13 75);
     --info: oklch(0.72 0.12 255);
     --sidebar: oklch(0.19 0.006 260);
+    color-scheme: dark;
   }
 }
 
