@@ -5,6 +5,7 @@ import { z } from "zod";
 import type { Container } from "../container.ts";
 import { audit } from "../platform/audit.ts";
 import { exportWorkspace } from "../platform/export.ts";
+import { connectStore, ShopifyCredentials, syncStore, WooCredentials } from "../modules/commerce/stores.ts";
 import { addEvidence, ClaimDecision, claimDetail, claimFile, claimForm, claimStatus, decideClaim, emailClaimDecision, listClaims, NewClaim, NewEvidence, setClaimsOpen, submitClaim } from "../modules/incidents/claims.ts";
 import { acceptInvitation, describeInvitation, invite, listInvitations, NewInvitation, revokeInvitation } from "../modules/identity/invitations.ts";
 import { DAY } from "../platform/clock.ts";
@@ -720,6 +721,25 @@ export function buildApp(c: Container): Router {
       reply.header("Content-Disposition", `attachment; filename="make-good-${org.slug}-${c.clock.now().toISOString().slice(0, 10)}.json"`);
       return data;
     },
+  });
+
+  // ---------- Shopify and WooCommerce ----------
+
+  const storeDeps = { db: c.db, clock: c.clock, secrets: c.secrets, fetchImpl: c.fetchImpl };
+  route({
+    method: "POST", path: "/api/orgs/:orgId/stores/shopify", summary: "Connect a Shopify store with a custom app's Admin API token (read_orders)", tag: "Commerce",
+    auth: { permission: "connections.manage" }, params: OrgParams, body: ShopifyCredentials, rateLimit: { max: 20, windowMs: 60 * 60_000 },
+    handler: async ({ body, org }) => connectStore(storeDeps, { orgId: org.orgId, kind: "shopify", data: body }),
+  });
+  route({
+    method: "POST", path: "/api/orgs/:orgId/stores/woocommerce", summary: "Connect a WooCommerce store with a REST API key pair (Read)", tag: "Commerce",
+    auth: { permission: "connections.manage" }, params: OrgParams, body: WooCredentials, rateLimit: { max: 20, windowMs: 60 * 60_000 },
+    handler: async ({ body, org }) => connectStore(storeDeps, { orgId: org.orgId, kind: "woocommerce", data: body }),
+  });
+  route({
+    method: "POST", path: "/api/orgs/:orgId/stores/:storeId/sync", summary: "Read new and changed orders from a connected Shopify or WooCommerce store", tag: "Commerce",
+    auth: { permission: "data.import" }, params: OrgParams.extend({ storeId: uuid }), rateLimit: { max: 30, windowMs: 60 * 60_000 },
+    handler: async ({ params, org }) => syncStore(storeDeps, { orgId: org.orgId, storeId: params.storeId }),
   });
 
   // ---------- customer claims ----------

@@ -50,6 +50,10 @@ services:
       # them in the server's outbox folder and sends nothing. To send for real,
       # set EMAIL_TRANSPORT to resend, add RESEND_API_KEY, and set EMAIL_FROM to
       # an address on a domain verified with Resend.
+      # Optional: server errors are also posted here as JSON (a Slack or Discord
+      # incoming webhook URL works). They are always listed on the Monitoring screen.
+      - key: ERROR_WEBHOOK_URL
+        sync: false
       - key: EMAIL_TRANSPORT
         value: file
       - key: RESEND_API_KEY

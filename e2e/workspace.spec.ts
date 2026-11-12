@@ -144,6 +144,27 @@ test("an owner adds a teammate, changes their role, and the teammate sees only w
   await mate.context.close();
 });
 
+test("the Shopify and WooCommerce forms explain what is wrong before anything is saved", async ({ page }) => {
+  await signUp(page, "Omar", "Omar Outdoor");
+  await nav(page, "Connections").click();
+  const box = page.getByTestId("connect-store");
+  await box.getByText("Connect Shopify or WooCommerce").click();
+  await box.getByLabel("Name in Make Good").fill("My Shopify");
+  await box.getByLabel("Store address").fill("omar-outdoor.com");
+  await box.getByLabel("Admin API access token").fill("shpat_not_a_real_token");
+  await box.getByRole("button", { name: "Check and connect" }).click();
+  await expect(page.getByText("Use the store's myshopify.com address")).toBeVisible();
+
+  await box.getByRole("button", { name: "WooCommerce" }).click();
+  await box.getByLabel("Name in Make Good").fill("My Woo");
+  await box.getByLabel("Site address").fill("https://localhost");
+  await box.getByLabel("Consumer key").fill("ck_abc");
+  await box.getByLabel("Consumer secret").fill("cs_def");
+  await box.getByRole("button", { name: "Check and connect" }).click();
+  await expect(page.getByText("The store address must be a public website.")).toBeVisible();
+  await expect(page.getByText("No store yet.")).toBeVisible();
+});
+
 test("monitoring, analytics, the AI switch, the backup download and the legal pages", async ({ page }) => {
   await signUp(page, "Ines", "Ines Hardware");
   await nav(page, "Monitoring").click();

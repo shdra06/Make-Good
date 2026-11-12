@@ -148,7 +148,11 @@ export function createRouter(input: { config: Config; identity: IdentityDeps; no
       return reply.code(422).send({
         error: {
           code: "VALIDATION_FAILED",
-          message: "Some of the information sent is not valid.",
+          // Say which field and why, in the words the schema gives, so a form can show it as it is.
+          message: `Some of the information sent is not valid. ${err.issues
+            .slice(0, 3)
+            .map((i) => (i.path.length ? `${i.path.join(".")}: ${i.message}` : i.message))
+            .join("; ")}`,
           details: err.issues.map((i) => ({ path: i.path.join("."), message: i.message })),
         },
       });
@@ -180,7 +184,7 @@ export function createRouter(input: { config: Config; identity: IdentityDeps; no
       url: spec.path,
       handler: async (req, reply) => {
         const ip = req.ip;
-        if (spec.rateLimit) await hitRateLimit(identity.db, `${spec.method} ${spec.path} ${ip}`, spec.rateLimit.max, spec.rateLimit.windowMs, input.now());
+        if (spec.rateLimit) await hitRateLimit(identity.db, `${spec.method} ${spec.path} ${ip}`, spec.rateLimit.max * config.rateLimitScale, spec.rateLimit.windowMs, input.now());
 
         let user: SessionUser | null = null;
         let org: Membership | null = null;

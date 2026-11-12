@@ -104,11 +104,16 @@ Known loose end: another session's `integration/proposed-0002_…sql` (outside t
 
 ## Last session
 
-12 Nov 2026 (branch `production-grade`), step 4 part 2 done: security at the database.
-- Rate limits are now kept in the database (`rate_limits`, migration 0006), so every process shares them and a restart does not reset them. Code: `hitRateLimit` in `apps/api/src/api/http.ts`.
-- Email through Resend: `ResendMailer` in `notify/mailer.ts`. It is used when `EMAIL_TRANSPORT=resend` and `RESEND_API_KEY` are set; the email ID is the idempotency key. It is tested with a fake Resend only, never with a real key. `render.yaml` lists the settings.
-- Customer data is encrypted at rest (`platform/pii.ts`). This covers names, emails, notice letters, raw PayPal and store payloads, webhook payloads, and the names inside approval lists. Email columns ending `_normalized` hold a keyed hash ("h1:…"), so matching still works. The database layer opens sealed values on read. `platform/pii-backfill.ts` seals old rows at start-up. A test scans every table after the full recall case and finds no readable customer name or email. Search now finds a whole email address only.
-- Row-level security (migration 0007) is on every table with `org_id`, and on `organisations`. Each request for an organisation runs in one transaction (`db.withOrg`) where the database shows only that organisation's rows; a nested `tx()` becomes a savepoint. A superuser switches to the role `makegood_app` inside that transaction. `/api/health` reports `rowLevelSecurity`. The job worker, webhooks and sign-in run outside it, limited by their own checks as before.
-- Checks: 129 API tests and 14 Playwright tests pass; types, lint and format are clean.
+12 Nov 2026 (branch `production-grade`, also on `main` and live on Render at https://make-good.onrender.com):
+- Fixed on the live site: row-level security rules failed on pooled Postgres connections (`invalid input syntax for type uuid: ""`), which broke about one request in three and the job worker. Migration 0008.
+- Privacy, terms and "how AI is used" pages (`apps/web/src/app/(legal)`), linked from the footer and sign-up. They are drafts that need a lawyer. Settings has a per-workspace AI switch (`aiEnabled`).
+- Error tracking: `platform/error-log.ts` writes server errors and failed jobs to `error_events`, shown on Monitoring; optional `ERROR_WEBHOOK_URL`.
+- Backup: Settings, "Download a backup" (`GET /orgs/:orgId/export`), all records as JSON without credentials or tokens. Not a database backup.
+- Monitoring screen (findings, differences from PayPal, errors, audit trail) and Analytics screen.
+- Email invitations (`identity/invitations.ts`, page `/invite/[token]`); the Team page invites instead of adding directly. Staff alerts (`notify/alerts.ts`) go through the job queue: list waiting for approval, payments finished, critical finding.
+- Claims portal (`incidents/claims.ts`): public form `/claim/[slug]` with photos (4 MB, 5 per claim, type checked from content, stored encrypted in Postgres), status page `/claim/status/[token]`, and a Claims tab on each incident for staff.
+- Shopify (GraphQL Admin API) and WooCommerce (REST v3) connectors (`commerce/stores.ts`) on the Connections page. Tested against recorded responses only.
+- Validation errors now name the field and the reason.
+- Tests: 138 API, 17 Playwright. `RATE_LIMIT_SCALE` (ignored in production) lets the browser tests create many accounts.
 
-Not verified: Resend with a real key; row-level security on Render's Postgres (whether its user may create the makegood_app role; if not, FORCE still applies to the owner); a real Postgres server at all for this step. Next: deploy to Render and check `/api/health`. Still missing: invitations by email, a Shopify or WooCommerce connector, monitoring and analytics screens, and the new demo video.
+Not verified: Shopify and WooCommerce against a real store; Resend with a real key; the error webhook with a real Slack or Discord URL. Not done: database backups (needs a paid Render Postgres), uptime checks, billing, the new demo video.

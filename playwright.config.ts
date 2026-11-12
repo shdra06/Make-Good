@@ -39,6 +39,8 @@ export default defineConfig({
         LOG_LEVEL: "warn",
         PUBLIC_URL: `http://localhost:${WEB_PORT}`,
         GEMINI_API_KEY: "",
+        // Many accounts are made from one address; the limits themselves are tested in the API tests.
+        RATE_LIMIT_SCALE: "10",
       },
     },
     {

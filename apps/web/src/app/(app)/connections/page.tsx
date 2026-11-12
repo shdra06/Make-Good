@@ -9,7 +9,7 @@ import { Panel, Tag } from "@/components/incident/bits";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Select, Table } from "@/components/ui/form";
-import { Alert, Label } from "@/components/ui/primitives";
+import { Alert, Badge, Label } from "@/components/ui/primitives";
 import { api } from "@/lib/api";
 import { day, time, words } from "@/lib/format";
 import { allowed, useOrgAction } from "@/lib/org-action";
@@ -262,6 +262,85 @@ function PayPalSection({ canManage, canImport }: { canManage: boolean; canImport
   );
 }
 
+type SyncResult = { read: number; created: number; updated: number; skipped: string[]; complete: boolean };
+
+/** Connect a Shopify or WooCommerce store. The API checks the credentials with one real call before saving. */
+function ConnectStore({ reload }: { reload: () => void }) {
+  const org = useOrg()!;
+  const { run, pending } = useOrgAction([["stores", org.orgId]]);
+  const [kind, setKind] = useState<"shopify" | "woocommerce">("shopify");
+  const submit = (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const form = e.currentTarget;
+    const f = Object.fromEntries(new FormData(form)) as Record<string, string>;
+    void run(() => api.post(orgPath(org, `/stores/${kind}`), f), `"${f.name}" is connected. Sync it to read its orders.`).then((r) => {
+      if (r) {
+        form.reset();
+        reload();
+      }
+    });
+  };
+  return (
+    <details className="rounded-lg border p-4" data-testid="connect-store">
+      <summary className="cursor-pointer text-sm font-medium">Connect Shopify or WooCommerce</summary>
+      <div className="mt-4 flex flex-col gap-4">
+        <div className="flex gap-2">
+          {(["shopify", "woocommerce"] as const).map((k) => (
+            <Button key={k} type="button" size="sm" variant={kind === k ? "default" : "outline"} onClick={() => setKind(k)}>
+              {k === "shopify" ? "Shopify" : "WooCommerce"}
+            </Button>
+          ))}
+        </div>
+        <form key={kind} onSubmit={submit} className="grid gap-4 sm:grid-cols-2">
+          <Field
+            label="Name in Make Good"
+            name="name"
+            required
+            minLength={2}
+            maxLength={120}
+            placeholder={kind === "shopify" ? "Shopify store" : "WooCommerce shop"}
+          />
+          {kind === "shopify" ? (
+            <>
+              <Field label="Store address" name="shopDomain" required placeholder="kitchen-co.myshopify.com" />
+              <div className="sm:col-span-2">
+                <Field
+                  label="Admin API access token"
+                  name="accessToken"
+                  type="password"
+                  autoComplete="off"
+                  required
+                  hint="In Shopify: Settings, Apps, Develop apps, create an app with the read_orders scope (read_all_orders for older orders), install it, copy the token."
+                />
+              </div>
+            </>
+          ) : (
+            <>
+              <Field label="Site address" name="baseUrl" type="url" required placeholder="https://shop.example.com" />
+              <Field label="Consumer key" name="consumerKey" autoComplete="off" required placeholder="ck_…" />
+              <Field
+                label="Consumer secret"
+                name="consumerSecret"
+                type="password"
+                autoComplete="off"
+                required
+                placeholder="cs_…"
+                hint="In WordPress: WooCommerce, Settings, Advanced, REST API, add a key with Read permission."
+              />
+            </>
+          )}
+          <div className="sm:col-span-2 flex flex-wrap items-center gap-3">
+            <Button type="submit" disabled={pending}>
+              {pending ? <Loader2 className="animate-spin" /> : <Plug />} Check and connect
+            </Button>
+            <span className="text-xs text-muted-foreground">Stored encrypted. Make Good only reads orders; it never changes your store.</span>
+          </div>
+        </form>
+      </div>
+    </details>
+  );
+}
+
 function StoresSection({ canManage, canImport }: { canManage: boolean; canImport: boolean }) {
   const org = useOrg()!;
   const key = ["stores", org.orgId];
@@ -278,10 +357,7 @@ function StoresSection({ canManage, canImport }: { canManage: boolean; canImport
   };
 
   return (
-    <Panel
-      title="Stores and orders"
-      hint="Where the orders come from. Orders arrive by spreadsheet (CSV) or through the import API. Shopify and WooCommerce connectors are not built yet."
-    >
+    <Panel title="Stores and orders" hint="Where the orders come from: Shopify, WooCommerce, a spreadsheet (CSV) or the import API.">
       {stores.isPending ? (
         <Loader2 className="size-5 animate-spin text-muted-foreground" aria-label="Loading" />
       ) : stores.isError ? (
@@ -298,6 +374,7 @@ function StoresSection({ canManage, canImport }: { canManage: boolean; canImport
                   <th>How orders arrive</th>
                   <th className="text-right">Orders</th>
                   <th>Last import</th>
+                  <th />
                 </tr>
               </thead>
               <tbody>
@@ -307,9 +384,36 @@ function StoresSection({ canManage, canImport }: { canManage: boolean; canImport
                       <Store className="mr-1 inline size-4 text-muted-foreground" aria-hidden />
                       {s.name}
                     </td>
-                    <td>{s.kind === "csv" ? "Spreadsheet" : s.kind === "custom" ? "Import API" : s.kind}</td>
+                    <td>
+                      {{ csv: "Spreadsheet", custom: "Import API", shopify: "Shopify", woocommerce: "WooCommerce" }[s.kind] ?? s.kind}
+                      {s.status === "invalid" ? (
+                        <Badge tone="stop" className="ml-2" title={s.last_error ?? undefined}>
+                          credentials refused
+                        </Badge>
+                      ) : s.last_error ? (
+                        <p className="text-xs text-destructive">{s.last_error}</p>
+                      ) : null}
+                    </td>
                     <td className="text-right tabular-nums">{s.orders}</td>
                     <td className="text-muted-foreground">{s.last_synced_at ? `${day(s.last_synced_at)} ${time(s.last_synced_at)}` : "never"}</td>
+                    <td className="text-right">
+                      {canImport && (s.kind === "shopify" || s.kind === "woocommerce") ? (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={pending}
+                          onClick={() =>
+                            void run(
+                              () => api.post<SyncResult>(orgPath(org, `/stores/${s.id}/sync`)),
+                              (r) =>
+                                `Read ${r.read} order${r.read === 1 ? "" : "s"}: ${r.created} new, ${r.updated} updated${r.skipped.length ? `, ${r.skipped.length} skipped` : ""}.${r.complete ? "" : " More remain; sync again."}`,
+                            )
+                          }
+                        >
+                          <RefreshCw /> Sync orders
+                        </Button>
+                      ) : null}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -325,6 +429,7 @@ function StoresSection({ canManage, canImport }: { canManage: boolean; canImport
               </Button>
             </form>
           ) : null}
+          {canManage ? <ConnectStore reload={() => void stores.refetch()} /> : null}
           {canImport && stores.data.length > 0 ? <CsvUpload orgUrl={orgPath(org)} onImported={() => void stores.refetch()} /> : null}
         </div>
       )}

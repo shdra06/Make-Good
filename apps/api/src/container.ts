@@ -41,6 +41,8 @@ export type Container = {
   mailer: Mailer | null;
   /** Records server errors and failed jobs (Monitoring screen, optional webhook). */
   errorLog: ErrorLog;
+  /** Outgoing HTTP (tests pass a fake). Undefined means the global fetch. */
+  fetchImpl?: typeof fetch;
 };
 
 export type Overrides = { db?: Db; clock?: Clock; fetchImpl?: typeof fetch; passwordCost?: ScryptCost; workerId?: string; ai?: EvidenceAi | null; mailer?: Mailer | null };
@@ -100,7 +102,7 @@ export async function createContainer(config: Config, overrides: Overrides = {})
   });
 
   return {
-    config, db, clock, deps, ai, secrets, connections, executor, fx, runner, handlers, mailer, errorLog,
+    config, db, clock, deps, ai, secrets, connections, executor, fx, runner, handlers, mailer, errorLog, fetchImpl: overrides.fetchImpl,
     identity: { db, clock, passwordCost: overrides.passwordCost },
   };
 }

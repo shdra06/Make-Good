@@ -48,6 +48,8 @@ const Env = z.object({
   FX_API_URL: z.string().url().default("https://api.frankfurter.dev/v1"),
   /** Optional: server errors are also posted here as JSON (a Slack or Discord webhook works). */
   ERROR_WEBHOOK_URL: z.string().url().optional(),
+  /** Tests only: multiplies every rate limit. Ignored in production. */
+  RATE_LIMIT_SCALE: z.coerce.number().int().min(1).max(1000).default(1),
   LOG_LEVEL: z.enum(["debug", "info", "warn", "error", "silent"]).default("info"),
 });
 
@@ -69,6 +71,7 @@ export type Config = {
   email: { transport: "file" | "resend"; resendApiKey: string | null; from: string };
   fxApiUrl: string;
   errorWebhookUrl: string | null;
+  rateLimitScale: number;
   logLevel: "debug" | "info" | "warn" | "error" | "silent";
 };
 
@@ -137,6 +140,7 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env, options: { r
     email: { transport: env.EMAIL_TRANSPORT, resendApiKey: env.RESEND_API_KEY ?? null, from: env.EMAIL_FROM },
     fxApiUrl: env.FX_API_URL.replace(/\/$/, ""),
     errorWebhookUrl: env.ERROR_WEBHOOK_URL ?? null,
+    rateLimitScale: production ? 1 : env.RATE_LIMIT_SCALE,
     logLevel: env.LOG_LEVEL,
   };
 }
