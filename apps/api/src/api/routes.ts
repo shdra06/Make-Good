@@ -54,7 +54,7 @@ export function buildApp(c: Container): Router {
     method: "GET", path: "/api/health", summary: "Liveness and database check", tag: "Service", auth: "public",
     handler: async () => {
       await c.db.query("select 1");
-      return { ok: true, database: c.db.kind, time: c.clock.now().toISOString() };
+      return { ok: true, database: c.db.kind, rowLevelSecurity: await c.db.rowSecurity(), time: c.clock.now().toISOString() };
     },
   });
   route({ method: "GET", path: "/api/openapi.json", summary: "This API, described in OpenAPI 3.1", tag: "Service", auth: "public", handler: async () => router.openapi() });

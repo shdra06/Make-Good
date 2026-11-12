@@ -519,3 +519,44 @@ test("rate limits are kept in the database, so a second server process sees the 
   h.clock.advance(15 * 60_000 + 1000);
   assert.equal((await anon.post("/api/auth/password-reset", { email: "later@example.com" })).status, 200, "a new window starts");
 });
+
+test("row-level security: inside one shop's request, the database itself hides and refuses other shops' rows", async () => {
+  const h = await harness();
+  const ada = await h.person("Ada", "Kitchen Co");
+  const bo = await h.person("Bo", "Garden Ltd");
+  for (const p of [ada, bo]) await p.post(`/api/orgs/${p.orgId}/incidents`, { kind: "recall", title: `Recall at ${p.email}` });
+  assert.equal(await h.db.rowSecurity(), true, "the rules apply to this connection");
+
+  // Every table holding shop data has the rules switched on and forced, including any added later.
+  const unprotected = await h.db.query<{ relname: string }>(
+    `select c.relname from pg_class c join pg_namespace n on n.oid = c.relnamespace
+      where n.nspname = 'public' and c.relkind = 'r' and (not c.relrowsecurity or not c.relforcerowsecurity)
+        and exists (select 1 from information_schema.columns k where k.table_schema = 'public' and k.table_name = c.relname and k.column_name = 'org_id')`,
+  );
+  assert.deepEqual(unprotected, []);
+
+  // A query that forgets "where org_id = ..." still sees only Ada's shop.
+  const seen = await h.db.withOrg(ada.orgId, () => h.db.query<{ org_id: string }>("select org_id from incidents"));
+  assert.ok(seen.length >= 1);
+  assert.ok(seen.every((r) => r.org_id === ada.orgId), "Bo's incidents are invisible");
+  const orgs = await h.db.withOrg(ada.orgId, () => h.db.query<{ id: string }>("select id from organisations"));
+  assert.deepEqual(orgs.map((o) => o.id), [ada.orgId]);
+
+  // Writing into another shop is refused by the database.
+  await assert.rejects(
+    h.db.withOrg(ada.orgId, () => h.db.query("insert into incidents (org_id, kind, title) values ($1, 'recall', 'planted')", [bo.orgId])),
+    /row-level security/,
+  );
+  const updated = await h.db.withOrg(ada.orgId, () => h.db.query("update incidents set title = 'changed' where org_id = $1 returning id", [bo.orgId]));
+  assert.equal(updated.length, 0, "and another shop's rows cannot be changed");
+
+  // A nested transaction inside the scope is a savepoint: its failure is undone alone.
+  const count = await h.db.withOrg(ada.orgId, async () => {
+    await h.db.tx(async (tx) => tx.query("update incidents set title = title where org_id = $1", [ada.orgId])).catch(() => undefined);
+    await h.db.tx(async () => { throw new Error("undo me"); }).catch(() => undefined);
+    return (await h.db.query<{ n: number }>("select count(*)::int as n from incidents"))[0]!.n;
+  });
+  assert.ok(count >= 1);
+  // Outside a scope (sign-in, the job worker), nothing changes.
+  assert.ok((await h.db.query("select id from organisations")).length >= 2);
+});

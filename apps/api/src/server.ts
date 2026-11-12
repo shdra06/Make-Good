@@ -20,6 +20,9 @@ if (config.workerInline) {
 }
 
 await app.listen({ port: config.port, host: "0.0.0.0" });
+if (!(await container.db.rowSecurity())) {
+  app.log.warn("Row-level security does not apply to this database user (a superuser without the makegood_app role). Shops are still kept apart by the app's own checks.");
+}
 if (config.env === "production" && config.email.transport === "file") {
   app.log.warn("EMAIL_TRANSPORT is file: emails are written to the outbox folder, not sent. Set EMAIL_TRANSPORT=resend and RESEND_API_KEY to send them.");
 }

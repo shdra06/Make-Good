@@ -185,7 +185,7 @@ export function createRouter(input: { config: Config; identity: IdentityDeps; no
             requirePermission(org, spec.auth.permission);
           }
         }
-        const result = await spec.handler({
+        const run = () => spec.handler({
           body: spec.body ? spec.body.parse(req.body ?? {}) : empty,
           query: spec.query ? spec.query.parse(req.query ?? {}) : empty,
           params: spec.params ? spec.params.parse(req.params ?? {}) : empty,
@@ -195,6 +195,9 @@ export function createRouter(input: { config: Config; identity: IdentityDeps; no
           reply,
           ip,
         });
+        // Work for one organisation runs in its own transaction, where the database
+        // itself shows only that organisation's rows (row-level security, migration 0007).
+        const result = org ? await identity.db.withOrg(org.orgId, run) : await run();
         if (reply.sent) return;
         if (result === undefined) return reply.code(204).send();
         return reply.send(result);

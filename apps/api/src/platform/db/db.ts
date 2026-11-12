@@ -14,6 +14,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
+import { AsyncLocalStorage } from "node:async_hooks";
 import { Pii } from "../pii.ts";
 
 export type Row = Record<string, unknown>;
@@ -31,7 +32,79 @@ export interface Db extends Queryable {
   readonly kind: "postgres" | "pglite";
   /** Runs `fn` in one transaction. Commits when it resolves, rolls back when it throws. */
   tx<T>(fn: (tx: Queryable) => Promise<T>): Promise<T>;
+  /**
+   * Runs `fn` as work for one organisation: in one transaction where row-level
+   * security shows only that organisation's rows (migration 0007). Every query
+   * made through this Db inside `fn`, however deep, joins that transaction;
+   * a nested tx() becomes a savepoint. Commits when `fn` resolves.
+   */
+  withOrg<T>(orgId: string, fn: () => Promise<T>): Promise<T>;
+  /** Whether row-level security actually applies to this connection (false for a superuser with no makegood_app role). */
+  rowSecurity(): Promise<boolean>;
   close(): Promise<void>;
+}
+
+type Scope = { tx: Queryable; savepoints: number; open: boolean };
+const scopes = new AsyncLocalStorage<Scope>();
+
+/** Adds withOrg() to a driver's Db. Queries inside a scope go to the scope's transaction. */
+function scopeable(base: Omit<Db, "withOrg" | "rowSecurity">): Db {
+  const current = () => {
+    const s = scopes.getStore();
+    return s && s.open ? s : null;
+  };
+  let canSwitchRole: Promise<{ role: boolean; enforced: boolean }> | null = null;
+  const roleInfo = () =>
+    (canSwitchRole ??= base
+      .query<{ bypass: boolean; member: boolean }>(
+        `select (r.rolsuper or r.rolbypassrls) as bypass,
+                exists (select 1 from pg_roles a where a.rolname = 'makegood_app') and pg_has_role(current_user, 'makegood_app', 'member') as member
+           from pg_roles r where r.rolname = current_user`,
+      )
+      .then(([r]) => ({ role: Boolean(r?.member && r.bypass), enforced: Boolean(r && (!r.bypass || r.member)) })));
+
+  const db: Db = {
+    kind: base.kind,
+    pii: base.pii,
+    query: (sql, params) => (current()?.tx ?? base).query(sql, params),
+    exec: (sql) => (current()?.tx ?? base).exec(sql),
+    async tx(fn) {
+      const s = current();
+      if (!s) return base.tx(fn);
+      const name = `sp_${++s.savepoints}`;
+      await s.tx.query(`savepoint ${name}`);
+      try {
+        const out = await fn(s.tx);
+        await s.tx.query(`release savepoint ${name}`);
+        return out;
+      } catch (err) {
+        await s.tx.query(`rollback to savepoint ${name}`).catch(() => undefined);
+        throw err;
+      }
+    },
+    async withOrg(orgId, fn) {
+      if (!/^[0-9a-f-]{36}$/i.test(orgId)) throw new Error("withOrg needs an organisation id.");
+      const outer = current();
+      if (outer) return fn(); // already scoped (same request)
+      const { role } = await roleInfo();
+      return base.tx(async (tx) => {
+        if (role) await tx.query("set local role makegood_app");
+        await tx.query("select set_config('app.org_id', $1, true)", [orgId]);
+        const scope: Scope = { tx, savepoints: 0, open: true };
+        try {
+          return await scopes.run(scope, fn);
+        } finally {
+          // Work started inside the scope that outlives it uses the database directly.
+          scope.open = false;
+        }
+      });
+    },
+    async rowSecurity() {
+      return (await roleInfo()).enforced;
+    },
+    close: () => base.close(),
+  };
+  return db;
 }
 
 const INT8_OID = 20;
@@ -80,7 +153,7 @@ async function openPostgres(url: string, pii: Pii): Promise<Db> {
     },
   });
 
-  return {
+  return scopeable({
     kind: "postgres",
     ...wrap(pool),
     async tx<T>(fn: (tx: Queryable) => Promise<T>): Promise<T> {
@@ -100,7 +173,7 @@ async function openPostgres(url: string, pii: Pii): Promise<Db> {
     async close() {
       await pool.end();
     },
-  };
+  });
 }
 
 async function openPglite(options: { pglite: "memory" } | { pglite: "file"; dataDir: string }, pii: Pii): Promise<Db> {
@@ -129,7 +202,7 @@ async function openPglite(options: { pglite: "memory" } | { pglite: "file"; data
     },
   });
 
-  return {
+  return scopeable({
     kind: "pglite",
     ...wrap(db as unknown as Runner),
     async tx<T>(fn: (tx: Queryable) => Promise<T>): Promise<T> {
@@ -138,7 +211,7 @@ async function openPglite(options: { pglite: "memory" } | { pglite: "file"; data
     async close() {
       await db.close();
     },
-  };
+  });
 }
 
 /** One process at a time may open a PGlite folder. A second one would damage it. */

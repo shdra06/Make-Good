@@ -104,12 +104,11 @@ Known loose end: another session's `integration/proposed-0002_…sql` (outside t
 
 ## Last session
 
-12 Nov 2026 (branch `production-grade`), new landing page and app polish, done before step 4 part 2:
-- Landing (`apps/web/src/app/page.tsx`, `src/components/landing/`): a Three.js hero (`recall-scene.tsx`) that plays the demo case in a loop (32 orders, 23 found, 5 held, 20 refunds through PayPal, customers turn green on PayPal's confirmation). It also has count-up numbers, tilted app screens that follow the mouse, a scroll timeline of the four steps, a bento grid of strengths and a final call to action.
-- Three.js loads only in the browser, as a separate chunk of about 238 KB compressed. The 3D pauses when off screen. With "reduce motion" it shows one still frame of the end state. Without WebGL it shows a plain fallback.
-- App: pages fade in (`(app)/template.tsx`), loading skeletons (`ui/skeleton.tsx`), and a "Create your workspace" screen for an account with no workspace (the dashboard used to spin forever).
-- Bug fixed: after signing out and in again, the app could send you back to sign-in because it had kept the old "signed out" answer.
-- Libraries: three 0.187.0, @react-three/fiber 9.8.2, motion 14.12.0 (pinned).
-- Checks: 14 Playwright tests (1 new), types, lint, format and build. API untouched (124 tests, as last run).
+12 Nov 2026 (branch `production-grade`), step 4 part 2 done: security at the database.
+- Rate limits are now kept in the database (`rate_limits`, migration 0006), so every process shares them and a restart does not reset them. Code: `hitRateLimit` in `apps/api/src/api/http.ts`.
+- Email through Resend: `ResendMailer` in `notify/mailer.ts`. It is used when `EMAIL_TRANSPORT=resend` and `RESEND_API_KEY` are set; the email ID is the idempotency key. It is tested with a fake Resend only, never with a real key. `render.yaml` lists the settings.
+- Customer data is encrypted at rest (`platform/pii.ts`). This covers names, emails, notice letters, raw PayPal and store payloads, webhook payloads, and the names inside approval lists. Email columns ending `_normalized` hold a keyed hash ("h1:…"), so matching still works. The database layer opens sealed values on read. `platform/pii-backfill.ts` seals old rows at start-up. A test scans every table after the full recall case and finds no readable customer name or email. Search now finds a whole email address only.
+- Row-level security (migration 0007) is on every table with `org_id`, and on `organisations`. Each request for an organisation runs in one transaction (`db.withOrg`) where the database shows only that organisation's rows; a nested `tx()` becomes a savepoint. A superuser switches to the role `makegood_app` inside that transaction. `/api/health` reports `rowLevelSecurity`. The job worker, webhooks and sign-in run outside it, limited by their own checks as before.
+- Checks: 129 API tests and 14 Playwright tests pass; types, lint and format are clean.
 
-Next: step 4 part 2, which is row-level security, encrypting customer names and emails, a real email transport (Resend), and a shared rate limiter. Then deploy to Render. Still missing: invitations by email, a Shopify or WooCommerce connector, monitoring and analytics screens, and the new demo video.
+Not verified: Resend with a real key; row-level security on Render's Postgres (whether its user may create the makegood_app role; if not, FORCE still applies to the owner); a real Postgres server at all for this step. Next: deploy to Render and check `/api/health`. Still missing: invitations by email, a Shopify or WooCommerce connector, monitoring and analytics screens, and the new demo video.
