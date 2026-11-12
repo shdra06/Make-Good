@@ -229,7 +229,7 @@ export class OperationExecutor {
          values ($1,$2,$3,$4,'refund','T1107',$5,$6,$7,$8,$9,$10,'api_lookup',$11::jsonb,$12)
          on conflict (org_id, provider, environment, transaction_id) do update set provider_status = excluded.provider_status, last_synced_at = excluded.last_synced_at`,
         [op.org_id, op.paypal_connection_id, conn!.environment, refund.id, refund.status === "PENDING" ? "P" : "S",
-         refund.create_time ?? now.toISOString(), op.currency, op.amount_minor, op.idempotency_key, op.capture_id, json(refund), now.toISOString()],
+         refund.create_time ?? now.toISOString(), op.currency, op.amount_minor, op.idempotency_key, op.capture_id, tx.pii.sealJson(refund), now.toISOString()],
       );
       let total: number | null = null;
       try {

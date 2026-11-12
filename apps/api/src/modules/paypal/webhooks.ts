@@ -66,7 +66,7 @@ export async function receivePayPalWebhook(
       `insert into provider_events (org_id, provider, environment, event_id, event_type, resource_type, resource_id, verified, verification_detail, payload, received_at)
        values ($1, 'paypal', $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10)
        on conflict (provider, event_id) do nothing returning id`,
-      [conn.org_id, conn.environment, eventId, eventType, str(event.resource_type), str(resource.id), verified, detail, json(event), now.toISOString()],
+      [conn.org_id, conn.environment, eventId, eventType, str(event.resource_type), str(resource.id), verified, detail, tx.pii.sealJson(event), now.toISOString()],
     );
     if (rows[0] && verified) {
       await enqueue(tx, { type: "provider_event.process", orgId: conn.org_id, payload: { providerEventId: rows[0].id } }, now);
@@ -91,7 +91,9 @@ export async function processProviderEvent(deps: Pick<WebhookDeps, "db" | "clock
   };
   if (!event.verified) return done("ignored: signature not verified");
 
-  const resource = rec(event.payload.resource);
+  // The payload is stored sealed (it carries payer details) and comes back opened, as JSON text.
+  const payload = (typeof event.payload === "string" ? JSON.parse(event.payload) : event.payload) as Json;
+  const resource = rec(rec(payload).resource);
   const type = event.event_type;
 
   if (type === "PAYMENT.CAPTURE.REFUNDED" || type === "PAYMENT.CAPTURE.REVERSED") {
@@ -116,7 +118,7 @@ export async function processProviderEvent(deps: Pick<WebhookDeps, "db" | "clock
          values ($1, $2, $3, 'refund', 'T1107', 'S', $4, $5, $6, $7, $8, 'webhook', $9::jsonb, $10)
          on conflict (org_id, provider, environment, transaction_id) do update set
            custom_id = coalesce(payment_transactions.custom_id, excluded.custom_id), last_synced_at = excluded.last_synced_at`,
-        [event.org_id, event.environment, refundId, str(resource.create_time) ?? now.toISOString(), currency, minor, customId, captureId, json(resource), now.toISOString()],
+        [event.org_id, event.environment, refundId, str(resource.create_time) ?? now.toISOString(), currency, minor, customId, captureId, tx.pii.sealJson(resource), now.toISOString()],
       );
       await recomputeRefundedTotals(tx, event.org_id);
       if (customId) {

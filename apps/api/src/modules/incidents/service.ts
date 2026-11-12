@@ -480,7 +480,7 @@ async function storeMatch(
          returning id, status`,
         [
           input.orgId, input.incidentId, rules.id, run!.id, draft.subjectKey, draft.orderId, draft.orderLineId,
-          draft.paymentId, draft.customerEmail, draft.customerName, draft.affectedQuantity, draft.classification,
+          draft.paymentId, tx.pii.seal(draft.customerEmail), tx.pii.seal(draft.customerName), draft.affectedQuantity, draft.classification,
           draft.needsConfirmation, status, draft.exclusionCode, json(draft.reasons), json(draft.missing),
           json(draft.facts), draft.recommendedAction, draft.paymentIdentity, draft.eligibility, draft.decision,
           now.toISOString(),

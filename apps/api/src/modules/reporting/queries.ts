@@ -137,8 +137,12 @@ export async function listCandidates(
   // Buyers shown not to be affected are part of the picture only when asked for.
   if (!filter.includeCleared && !filter.status && !filter.disposition && !filter.eligibility) where += " and c.status <> 'cleared'";
   if (filter.search) {
-    params.push(`%${filter.search.toLowerCase()}%`);
-    where += ` and (lower(coalesce(c.customer_email, '')) like $${params.length} or lower(coalesce(c.customer_name, '')) like $${params.length} or lower(coalesce(o.order_number, '')) like $${params.length})`;
+    // Customer names and emails are stored encrypted, so they match by whole email address only (through its keyed hash).
+    params.push(`%${filter.search.toLowerCase()}%`, q.pii.emailIndex(filter.search));
+    const like = params.length - 1;
+    const idx = params.length;
+    where += ` and (lower(coalesce(o.order_number, '')) like $${like} or o.customer_email_normalized = $${idx}
+                    or exists (select 1 from payment_transactions pt where pt.org_id = c.org_id and pt.id = c.payment_transaction_id and pt.payer_email_normalized = $${idx}))`;
   }
   const [total] = await q.query<{ n: number }>(`select count(*)::int as n ${MAP_FROM} where c.org_id = $1 and c.incident_id = $2 ${where}`, params);
   const rows = await q.query(
@@ -363,8 +367,8 @@ export async function listPayments(q: Queryable, orgId: string, filter: { search
     where += ` and p.kind = $${params.length}`;
   }
   if (filter.search) {
-    params.push(`%${filter.search.toLowerCase()}%`);
-    where += ` and (lower(p.transaction_id) like $${params.length} or lower(coalesce(p.payer_email, '')) like $${params.length} or lower(coalesce(p.invoice_id, '')) like $${params.length})`;
+    params.push(`%${filter.search.toLowerCase()}%`, q.pii.emailIndex(filter.search));
+    where += ` and (lower(p.transaction_id) like $${params.length - 1} or lower(coalesce(p.invoice_id, '')) like $${params.length - 1} or p.payer_email_normalized = $${params.length})`;
   }
   const [total] = await q.query<{ n: number }>(`select count(*)::int as n from payment_transactions p where p.org_id = $1 ${where}`, params);
   const rows = await q.query(
@@ -385,9 +389,10 @@ export async function listOrders(q: Queryable, orgId: string, filter: { search?:
   const params: unknown[] = [orgId];
   let where = "";
   if (filter.search) {
-    params.push(`%${filter.search.toLowerCase()}%`);
-    where += ` and (lower(o.order_number) like $${params.length} or lower(coalesce(o.customer_email, '')) like $${params.length}
-                    or exists (select 1 from order_lines l where l.org_id = o.org_id and l.order_id = o.id and lower(coalesce(l.sku, '')) like $${params.length}))`;
+    params.push(`%${filter.search.toLowerCase()}%`, q.pii.emailIndex(filter.search));
+    const like = params.length - 1;
+    where += ` and (lower(o.order_number) like $${like} or o.customer_email_normalized = $${params.length}
+                    or exists (select 1 from order_lines l where l.org_id = o.org_id and l.order_id = o.id and lower(coalesce(l.sku, '')) like $${like}))`;
   }
   const [total] = await q.query<{ n: number }>(`select count(*)::int as n from orders o where o.org_id = $1 ${where}`, params);
   const rows = await q.query(

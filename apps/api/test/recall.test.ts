@@ -299,6 +299,26 @@ test("the recall case, from the supplier's notice to PayPal's confirmation", asy
   for (const action of ["evidence.extracted", "evidence.extraction_accepted", "alias.confirm", "alias.reject", "candidates.confirm", "payment.reconciled", "batch.created", "batch.approve", "batch.started", "operation.succeeded", "operation.unknown", "operation.failed_final"]) {
     assert.ok(actions.has(action), `the audit trail records ${action}`);
   }
+
+  // Customer data at rest: after the whole case, no customer email or name can be read anywhere in the database.
+  const people = await h.db.query<{ customer_email: string | null; customer_name: string | null }>(
+    "select customer_email, customer_name from orders where org_id = $1",
+    [h.org],
+  );
+  const secrets = new Set(people.flatMap((p) => [p.customer_email, p.customer_name]).filter((v): v is string => Boolean(v && v.length > 3)));
+  assert.ok(secrets.size > 20, "the database layer opens the data for the code that reads it");
+  assert.ok([...secrets].some((v) => v.includes("@")));
+  const tables = await h.db.query<{ table_name: string }>(
+    "select table_name from information_schema.tables where table_schema = 'public' and table_type = 'BASE TABLE' and table_name not in ('users', 'sessions', 'account_tokens')",
+  );
+  const leaks: string[] = [];
+  for (const { table_name } of tables) {
+    const dump = (await h.db.query<{ t: string }>(`select t::text as t from ${table_name} t`)).map((r) => r.t.toLowerCase()).join(" | ");
+    for (const secret of secrets) if (dump.includes(secret.toLowerCase())) leaks.push(`${table_name}: ${secret}`);
+  }
+  assert.deepEqual(leaks, [], "customer names and emails are stored only encrypted");
+  const [one] = await h.db.query<{ raw: string; idx: string }>("select customer_email::text as raw, customer_email_normalized as idx from orders where org_id = $1 and customer_email is not null limit 1", [h.org]);
+  assert.match(one!.idx, /^h1:[0-9a-f]{64}$/);
 });
 
 // ---------- evidence reading: the checks every reader's output goes through ----------

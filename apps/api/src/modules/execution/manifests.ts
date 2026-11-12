@@ -172,12 +172,26 @@ export type ManifestRow = {
 
 const MANIFEST_COLUMNS = "id, batch_id, version, status, content, content_hash, item_count, created_at, invalidated_at, invalidated_reason";
 
+/** Opens the customer fields of a stored list for reading. The stored form (and its hash) stays sealed. */
+function opened(q: Queryable, row: ManifestRow | undefined): ManifestRow | null {
+  if (!row) return null;
+  const open = (v: string | null) => (v ? q.pii.open(v) : v);
+  return {
+    ...row,
+    content: {
+      ...row.content,
+      items: row.content.items.map((i) => ({ ...i, customerName: open(i.customerName), customerEmail: open(i.customerEmail) })),
+      notIncluded: (row.content.notIncluded ?? []).map((h) => ({ ...h, customerName: open(h.customerName), customerEmail: open(h.customerEmail) })),
+    },
+  };
+}
+
 export async function currentManifest(q: Queryable, orgId: string, batchId: string): Promise<ManifestRow | null> {
   const rows = await q.query<ManifestRow>(
     `select ${MANIFEST_COLUMNS} from approval_manifests where org_id = $1 and batch_id = $2 and status = 'current'`,
     [orgId, batchId],
   );
-  return rows[0] ?? null;
+  return opened(q, rows[0]);
 }
 
 export async function listManifests(q: Queryable, orgId: string, batchId: string) {
@@ -193,7 +207,7 @@ export async function manifestByVersion(q: Queryable, orgId: string, batchId: st
     `select ${MANIFEST_COLUMNS} from approval_manifests where org_id = $1 and batch_id = $2 and version = $3`,
     [orgId, batchId, version],
   );
-  return rows[0] ?? null;
+  return opened(q, rows[0]);
 }
 
 /**
@@ -267,8 +281,9 @@ export async function writeManifest(
       sku: i.sku,
       lineTitle: i.lineTitle,
       affectedQuantity: i.affectedQuantity,
-      customerName: i.customerName,
-      customerEmail: i.customerEmail,
+      // Customer data is sealed inside the stored list; the fingerprint covers the sealed form.
+      customerName: tx.pii.seal(i.customerName),
+      customerEmail: tx.pii.seal(i.customerEmail),
       paymentIdentity: i.paymentIdentity,
       eligibility: i.eligibility,
       decision: i.decision,
@@ -283,7 +298,7 @@ export async function writeManifest(
       captureRefundedBeforeMinor: i.captureRefundedMinor,
       evidence: evidenceOf.get(i.candidateId) ?? [],
     })),
-    notIncluded: input.held,
+    notIncluded: input.held.map((h) => ({ ...h, customerName: tx.pii.seal(h.customerName), customerEmail: tx.pii.seal(h.customerEmail) })),
     totals: input.totals,
     cohort: await cohortSnapshot(tx, input.orgId, batch!.incident_id),
     previous: previous

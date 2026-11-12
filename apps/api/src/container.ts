@@ -17,6 +17,8 @@ import type { Deps as IdentityDeps } from "./modules/identity/service.ts";
 import { PayPalConnections } from "./modules/paypal/connections.ts";
 import { processProviderEvent } from "./modules/paypal/webhooks.ts";
 import { syncTransactions } from "./modules/transactions/sync.ts";
+import { Pii } from "./platform/pii.ts";
+import { sealExistingCustomerData } from "./platform/pii-backfill.ts";
 import { FileMailer, ResendMailer, type Mailer } from "./modules/notify/mailer.ts";
 
 export type Container = {
@@ -43,8 +45,11 @@ export async function createContainer(config: Config, overrides: Overrides = {})
   const clock = overrides.clock ?? systemClock;
   const db =
     overrides.db ??
-    (await openDb(config.databaseUrl ? { url: config.databaseUrl } : { pglite: "file", dataDir: path.join(config.dataDir, "pg") }));
-  if (!overrides.db) await migrate(db);
+    (await openDb(config.databaseUrl ? { url: config.databaseUrl } : { pglite: "file", dataDir: path.join(config.dataDir, "pg") }, new Pii(config.encryptionKey)));
+  if (!overrides.db) {
+    await migrate(db);
+    await sealExistingCustomerData(db);
+  }
 
   const secrets = new SecretBox({ k1: config.encryptionKey }, "k1");
   const deps = { db, clock };

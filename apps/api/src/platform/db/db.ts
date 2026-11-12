@@ -14,11 +14,15 @@
 
 import fs from "node:fs";
 import path from "node:path";
+import { Pii } from "../pii.ts";
 
 export type Row = Record<string, unknown>;
 
 export interface Queryable {
+  /** Rows come back with customer data already opened (see pii.ts). */
   query<T = Row>(sql: string, params?: readonly unknown[]): Promise<T[]>;
+  /** Seals customer data before it is written. */
+  readonly pii: Pii;
   /** Runs several statements with no parameters. Used by migrations. */
   exec(sql: string): Promise<void>;
 }
@@ -42,11 +46,17 @@ export type OpenOptions =
   | { pglite: "memory" }
   | { pglite: "file"; dataDir: string };
 
-export async function openDb(options: OpenOptions): Promise<Db> {
-  return "url" in options ? openPostgres(options.url) : openPglite(options);
+/**
+ * `pii` holds the key for customer data. Without one, a random key is used: right
+ * for in-memory databases, wrong for anything kept (its data could not be read again).
+ */
+export async function openDb(options: OpenOptions, pii?: Pii): Promise<Db> {
+  if (!pii && !("pglite" in options && options.pglite === "memory")) throw new Error("A kept database needs the customer-data key.");
+  const key = pii ?? Pii.ephemeral();
+  return "url" in options ? openPostgres(options.url, key) : openPglite(options, key);
 }
 
-async function openPostgres(url: string): Promise<Db> {
+async function openPostgres(url: string, pii: Pii): Promise<Db> {
   const pg = await import("pg");
   const needsSsl = /sslmode=require/.test(url) || /render\.com|neon\.tech|supabase\.co/.test(url);
   const pool = new pg.default.Pool({
@@ -60,9 +70,10 @@ async function openPostgres(url: string): Promise<Db> {
   } as ConstructorParameters<typeof pg.default.Pool>[0]);
 
   const wrap = (runner: { query: (sql: string, params?: unknown[]) => Promise<{ rows: unknown[] }> }): Queryable => ({
+    pii,
     async query<T>(sql: string, params: readonly unknown[] = []) {
       const res = await runner.query(sql, params as unknown[]);
-      return res.rows as T[];
+      return pii.openRows(res.rows as T[]);
     },
     async exec(sql: string) {
       await runner.query(sql);
@@ -92,7 +103,7 @@ async function openPostgres(url: string): Promise<Db> {
   };
 }
 
-async function openPglite(options: { pglite: "memory" } | { pglite: "file"; dataDir: string }): Promise<Db> {
+async function openPglite(options: { pglite: "memory" } | { pglite: "file"; dataDir: string }, pii: Pii): Promise<Db> {
   const { PGlite } = await import("@electric-sql/pglite");
   let dir: string | undefined;
   if (options.pglite === "file") {
@@ -108,9 +119,10 @@ async function openPglite(options: { pglite: "memory" } | { pglite: "file"; data
     exec: (sql: string) => Promise<unknown>;
   };
   const wrap = (runner: Runner): Queryable => ({
+    pii,
     async query<T>(sql: string, params: readonly unknown[] = []) {
       const res = await runner.query(sql, params as unknown[]);
-      return res.rows as T[];
+      return pii.openRows(res.rows as T[]);
     },
     async exec(sql: string) {
       await runner.exec(sql);

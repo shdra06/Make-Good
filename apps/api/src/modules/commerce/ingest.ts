@@ -182,10 +182,10 @@ export async function upsertOrder(q: Queryable, orgId: string, connectionId: str
      returning id, (xmax = 0) as created`,
     [
       orgId, connectionId, input.externalId, input.orderNumber, input.channel, input.placedAt, cur,
-      input.customer.email, normEmail(input.customer.email), input.customer.name, input.customer.externalId,
-      input.customer.isGuest, input.billingEmail, input.shippingName, input.shippingCountry, input.paymentMethod,
+      q.pii.seal(input.customer.email), q.pii.index(normEmail(input.customer.email)), q.pii.seal(input.customer.name), input.customer.externalId,
+      input.customer.isGuest, q.pii.seal(input.billingEmail), q.pii.seal(input.shippingName), input.shippingCountry, input.paymentMethod,
       input.paymentReference, subtotal, discount, shipping, tax, total, input.status,
-      json({ source: input.raw ?? null, warnings }),
+      q.pii.sealJson({ source: input.raw ?? null, warnings }),
     ],
   );
   const orderId = rows[0]!.id;

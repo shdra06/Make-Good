@@ -38,8 +38,9 @@ async function record(
       `insert into customer_notices (org_id, incident_id, candidate_id, payment_operation_id, kind, to_email, subject, body, transport, created_by, created_at)
        values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
        on conflict do nothing returning id`,
-      [input.orgId, input.who.incident_id, input.who.candidate_id, input.operationId ?? null, input.kind, input.who.customer_email,
-        input.subject, input.text, mailer.transport, input.userId, now.toISOString()],
+      // The address and the letter (which greets the customer by name) are customer data.
+      [input.orgId, input.who.incident_id, input.who.candidate_id, input.operationId ?? null, input.kind, tx.pii.seal(input.who.customer_email),
+        input.subject, tx.pii.seal(input.text), mailer.transport, input.userId, now.toISOString()],
     );
     if (!row) return null; // this payment was already announced
     const { ref } = await mailer.send({ id: row.id, to: input.who.customer_email!, subject: input.subject, text: input.text, at: now });

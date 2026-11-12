@@ -378,7 +378,7 @@ export async function loadRecallScenario(
            on conflict (org_id, dataset, order_line_id) do update set
              case_tag = excluded.case_tag, note = excluded.note, affected_units = excluded.affected_units,
              owed_minor = excluded.owed_minor, true_capture_id = excluded.true_capture_id`,
-          [input.orgId, data.dataset, result.orderId, line!.id, label.caseTag, label.note, label.affectedUnits, label.owedMinor, label.trueCaptureId],
+          [input.orgId, data.dataset, result.orderId, line!.id, label.caseTag, tx.pii.seal(label.note), label.affectedUnits, label.owedMinor, label.trueCaptureId],
         );
         labels++;
       }

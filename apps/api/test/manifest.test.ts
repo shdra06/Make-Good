@@ -47,7 +47,10 @@ test("the manifest lists exactly what the worker will send, explains each paymen
   const [op] = await s.operations(batchId);
   assert.equal(stored.version, 1);
   assert.equal(stored.content_hash, manifest.contentHash);
-  assert.equal(hashManifest(stored.content), stored.content_hash, "the hash is of the stored content");
+  // The hash covers the content as stored, with customer fields sealed; reading opens them.
+  const [raw] = await s.db.query<{ content: Parameters<typeof hashManifest>[0] }>("select content from approval_manifests where id = $1", [stored.id]);
+  assert.equal(hashManifest(raw!.content), stored.content_hash, "the hash is of the stored content");
+  assert.match(String(raw!.content.items[0]!.customerEmail), /^pii1:/, "the stored list holds no readable customer email");
 
   const { items, notIncluded, rule, environment } = stored.content;
   assert.equal(items.length, 1);

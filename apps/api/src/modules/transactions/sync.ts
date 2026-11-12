@@ -75,11 +75,11 @@ async function upsertTransaction(
        raw = excluded.raw, last_synced_at = excluded.last_synced_at`,
     [
       orgId, connectionId, environment, t.transaction_id, kind, t.event_code ?? null, t.status ?? null, t.initiated_at,
-      t.updated_at ?? null, currency, gross, fee, t.payer?.account_id ?? null, t.payer?.email ?? null,
-      t.payer?.email ? t.payer.email.trim().toLowerCase() : null, t.payer?.name ?? null,
+      t.updated_at ?? null, currency, gross, fee, t.payer?.account_id ?? null, q.pii.seal(t.payer?.email ?? null),
+      q.pii.emailIndex(t.payer?.email), q.pii.seal(t.payer?.name ?? null),
       t.payer?.country_code && /^[A-Z]{2}$/.test(t.payer.country_code) ? t.payer.country_code : null,
       t.invoice_id ?? null, t.custom_field ?? null, kind === "refund" ? t.reference_id ?? null : null,
-      json(items), json(t.raw), now.toISOString(),
+      json(items), q.pii.sealJson(t.raw), now.toISOString(),
     ],
   );
   return kind;
@@ -206,7 +206,7 @@ export async function lookupPaymentsByReference(
         input.orgId, input.connectionId, input.provider.environment, capture.id, capture.status,
         capture.create_time ?? new Date(order.placed_at).toISOString(), capture.amount.currency_code, gross,
         capture.status === "REFUNDED" ? gross : 0, capture.invoice_id ?? null, capture.custom_id ?? null,
-        json(capture), clock.now().toISOString(),
+        db.pii.sealJson(capture), clock.now().toISOString(),
       ],
     );
     result.found++;
