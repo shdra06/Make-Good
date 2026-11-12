@@ -1,5 +1,6 @@
 import path from "node:path";
 import { expect, test, type Browser, type Page } from "@playwright/test";
+import { linkFor } from "./outbox";
 
 // The screens a merchant uses to set up: opening an incident, connections,
 // the team and its roles, and settings.
@@ -83,15 +84,30 @@ test("an owner adds a teammate, changes their role, and the teammate sees only w
   await nav(page, "Team").click();
   await page.getByLabel("Their email").fill(mate.email);
   await page.getByLabel("Role", { exact: true }).selectOption("reviewer");
-  await page.getByRole("button", { name: "Add to the team" }).click();
+  await page.getByRole("button", { name: "Send invitation" }).click();
+  await expect(page.getByText(`Invitation sent to ${mate.email}.`)).toBeVisible();
+  await expect(page.getByTestId("invitations")).toContainText(mate.email);
+  await expect(page.getByTestId("members")).not.toContainText(mate.email);
+
+  // Tomas opens the emailed link and accepts; he lands in Lena's workspace.
+  await mate.page.goto(await linkFor(mate.email, "invite"));
+  await expect(mate.page.getByRole("heading", { name: "Join Lena Kitchen" })).toBeVisible();
+  await mate.page.getByRole("button", { name: "Accept and open the workspace" }).click();
+  await expect(mate.page).toHaveURL(/\/dashboard$/);
+  await expect(mate.page.getByLabel("Workspace")).toHaveValue(/.+/);
+
+  await page.reload();
   await expect(page.getByTestId("members")).toContainText(mate.email);
+  await expect(page.getByTestId("invitations")).toHaveCount(0);
   await page.getByLabel("Role of Tomas").selectOption("viewer");
   await expect(page.getByText("Tomas is now viewer.")).toBeVisible();
 
-  // An unknown email is refused with the API's own words
-  await page.getByLabel("Their email").fill(`nobody-${unique()}@example.com`);
-  await page.getByRole("button", { name: "Add to the team" }).click();
-  await expect(page.getByText("No account uses that email yet.")).toBeVisible();
+  // A second invitation can be withdrawn before it is used.
+  const nobody = `nobody-${unique()}@example.com`;
+  await page.getByLabel("Their email").fill(nobody);
+  await page.getByRole("button", { name: "Send invitation" }).click();
+  await page.getByTestId("invitations").getByRole("button", { name: "Withdraw" }).click();
+  await expect(page.getByText(`Invitation to ${nobody} withdrawn.`)).toBeVisible();
 
   // Settings: two approvals and the four-eyes rule
   await nav(page, "Settings").click();
@@ -126,4 +142,42 @@ test("an owner adds a teammate, changes their role, and the teammate sees only w
   );
   expect(settings, "a viewer cannot change settings").toBe(403);
   await mate.context.close();
+});
+
+test("monitoring, analytics, the AI switch, the backup download and the legal pages", async ({ page }) => {
+  await signUp(page, "Ines", "Ines Hardware");
+  await nav(page, "Monitoring").click();
+  await expect(page.getByRole("heading", { name: "Monitoring" })).toBeVisible();
+  await expect(page.getByTestId("findings")).toContainText("No findings");
+  await page.getByRole("button", { name: "Run checks now" }).click();
+  await expect(page.getByText("Checks ran.")).toBeVisible();
+  await expect(page.getByTestId("errors")).toContainText("No errors recorded.");
+  await expect(page.getByTestId("audit")).toContainText("Unaltered");
+
+  await nav(page, "Analytics").click();
+  await expect(page.getByRole("heading", { name: "Analytics" })).toBeVisible();
+  await expect(page.getByTestId("by-incident")).toContainText("No incidents yet.");
+
+  await nav(page, "Settings").click();
+  const ai = page.getByTestId("ai-panel").getByRole("checkbox");
+  await expect(ai).toBeChecked();
+  await ai.uncheck();
+  await expect(page.getByText("AI is off.")).toBeVisible();
+  await page.reload();
+  await expect(page.getByTestId("ai-panel").getByRole("checkbox")).not.toBeChecked();
+  const download = page.waitForEvent("download");
+  await page.getByRole("link", { name: "Download a backup" }).click();
+  expect((await download).suggestedFilename()).toMatch(/^make-good-ines-hardware-\d{4}-\d{2}-\d{2}\.json$/);
+
+  await page.goto("/");
+  for (const [link, heading] of [
+    ["Privacy", "Privacy"],
+    ["Terms", "Terms of use"],
+    ["How AI is used", "How AI is used"],
+  ] as const) {
+    await page.goto("/");
+    await page.getByRole("contentinfo").getByRole("link", { name: link }).click();
+    await expect(page.getByRole("heading", { level: 1, name: heading })).toBeVisible();
+  }
+  await expect(page.getByText("Customer names or email addresses.")).toBeVisible();
 });

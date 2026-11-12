@@ -18,6 +18,7 @@ import { PayPalConnections } from "./modules/paypal/connections.ts";
 import { processProviderEvent } from "./modules/paypal/webhooks.ts";
 import { syncTransactions } from "./modules/transactions/sync.ts";
 import { Pii } from "./platform/pii.ts";
+import { sendAlert } from "./modules/notify/alerts.ts";
 import { createErrorLog, type ErrorLog } from "./platform/error-log.ts";
 import { sealExistingCustomerData } from "./platform/pii-backfill.ts";
 import { FileMailer, ResendMailer, type Mailer } from "./modules/notify/mailer.ts";
@@ -80,6 +81,9 @@ export async function createContainer(config: Config, overrides: Overrides = {})
     },
     "provider_event.process": async (job: Job) => {
       await processProviderEvent(deps, String(job.payload.providerEventId));
+    },
+    "staff.alert": async (job: Job) => {
+      await sendAlert({ db, clock, mailer, publicUrl: config.publicUrl }, job);
     },
     "detectors.run": async (job: Job) => {
       await runDetectors(deps, job.org_id!);

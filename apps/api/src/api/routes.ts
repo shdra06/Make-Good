@@ -5,6 +5,7 @@ import { z } from "zod";
 import type { Container } from "../container.ts";
 import { audit } from "../platform/audit.ts";
 import { exportWorkspace } from "../platform/export.ts";
+import { acceptInvitation, describeInvitation, invite, listInvitations, NewInvitation, revokeInvitation } from "../modules/identity/invitations.ts";
 import { DAY } from "../platform/clock.ts";
 import { ConflictError, NotConfiguredError, NotFoundError, ValidationError } from "../platform/errors.ts";
 import { NewPassword, requestPasswordReset, resetPassword, sendVerification, TokenOnly, verifyEmail, type LinkOutcome } from "../modules/identity/account.ts";
@@ -718,6 +719,38 @@ export function buildApp(c: Container): Router {
       reply.header("Content-Disposition", `attachment; filename="make-good-${org.slug}-${c.clock.now().toISOString().slice(0, 10)}.json"`);
       return data;
     },
+  });
+
+  // ---------- invitations ----------
+
+  route({
+    method: "GET", path: "/api/orgs/:orgId/invitations", summary: "Invitations not yet accepted", tag: "Organisation",
+    auth: { permission: "members.manage" }, params: OrgParams,
+    handler: async ({ org }) => listInvitations(c.identity, org.orgId),
+  });
+  route({
+    method: "POST", path: "/api/orgs/:orgId/invitations", summary: "Invite someone by email, with a role", tag: "Organisation",
+    auth: { permission: "members.manage" }, params: OrgParams, body: NewInvitation, rateLimit: { max: 30, windowMs: 60 * 60_000 },
+    handler: async ({ body, org, user, req }) => {
+      const out = await invite(c.identity, c.mailer, { ...body, orgId: org.orgId, actorId: user.id, actorRole: org.role, publicUrl: c.config.publicUrl });
+      devLink(req, { sent: out.sent, url: out.url });
+      return { id: out.id, sent: out.sent };
+    },
+  });
+  route({
+    method: "DELETE", path: "/api/orgs/:orgId/invitations/:invitationId", summary: "Withdraw an invitation", tag: "Organisation",
+    auth: { permission: "members.manage" }, params: OrgParams.extend({ invitationId: uuid }),
+    handler: async ({ params, org, user }) => revokeInvitation(c.identity, { orgId: org.orgId, id: params.invitationId, actorId: user.id }),
+  });
+  route({
+    method: "GET", path: "/api/public/invitations/:token", summary: "What an invitation link offers", tag: "Public", auth: "public",
+    params: z.object({ token: z.string().min(20).max(80) }), rateLimit: { max: 30, windowMs: 10 * 60_000 },
+    handler: async ({ params }) => describeInvitation(c.identity, params.token),
+  });
+  route({
+    method: "POST", path: "/api/auth/invitations/accept", summary: "Join the workspace an invitation is for. The account's email must match.", tag: "Auth",
+    auth: "user", body: TokenOnly, rateLimit: { max: 20, windowMs: 10 * 60_000 },
+    handler: async ({ body, user }) => acceptInvitation(c.identity, { token: body.token, userId: user.id }),
   });
 
   // ---------- currencies ----------

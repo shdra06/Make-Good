@@ -9,6 +9,7 @@
 // before the batch starts, the approval is withdrawn and the batch goes back
 // to draft, where it can be revised into a new manifest version.
 
+import { queueAlert } from "../notify/alerts.ts";
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import { audit } from "../../platform/audit.ts";
@@ -504,6 +505,7 @@ export async function submitBatch(deps: Deps, input: { orgId: string; batchId: s
       orgId: input.orgId, actor: { kind: "user", userId: input.userId }, action: "batch.submitted", entityType: "batch",
       entityId: batch.id, data: { totalsHash: batch.totals_hash, manifestVersion: manifest.version, manifestHash: manifest.contentHash }, at: now,
     });
+    await queueAlert(tx, input.orgId, { kind: "batch.submitted", batchId: batch.id }, now);
   });
 }
 
@@ -719,4 +721,5 @@ export async function finishBatchIfDone(tx: Queryable, orgId: string, batchId: s
     orgId, actor: { kind: "system" }, action: "batch.finished", entityType: "batch", entityId: batchId,
     data: { status: to, failed: counts.failed }, at: now,
   });
+  await queueAlert(tx, orgId, { kind: "batch.finished", batchId }, now);
 }

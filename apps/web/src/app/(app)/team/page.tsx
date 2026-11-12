@@ -16,6 +16,7 @@ import { allowed, useOrgAction } from "@/lib/org-action";
 import { orgPath, useMe, useOrg } from "@/lib/session";
 
 type Member = { user_id: string; email: string; name: string; role: Role; created_at: string };
+type Invitation = { id: string; email: string; role: Role; created_at: string; expires_at: string; invited_by: string | null };
 
 /** What each role may do, in words. Mirrors the API's grants; the API is what enforces them. */
 const ROLE_DOES: Record<Role, string> = {
@@ -32,7 +33,14 @@ export default function TeamPage() {
   const me = useMe();
   const key = ["members", org?.orgId];
   const members = useQuery({ queryKey: key, queryFn: () => api.get<Member[]>(orgPath(org!, "/members")), enabled: org !== null });
-  const { run, pending } = useOrgAction([key]);
+  const invitesKey = ["invitations", org?.orgId];
+  const canManageTeam = allowed(org?.permissions, "members.manage");
+  const invitations = useQuery({
+    queryKey: invitesKey,
+    queryFn: () => api.get<Invitation[]>(orgPath(org!, "/invitations")),
+    enabled: org !== null && canManageTeam,
+  });
+  const { run, pending } = useOrgAction([key, invitesKey]);
   const [role, setRole] = useState<Role>("operator");
   if (!org) return null;
   const canManage = allowed(org.permissions, "members.manage");
@@ -44,7 +52,10 @@ export default function TeamPage() {
     e.preventDefault();
     const form = e.currentTarget;
     const email = String(new FormData(form).get("email")).trim();
-    void change(email, role, `${email} is now ${ROLE_LABELS[role].toLowerCase()}.`).then((r) => {
+    void run(
+      () => api.post<{ sent: boolean }>(orgPath(org, "/invitations"), { email, role }),
+      (r) => (r.sent ? `Invitation sent to ${email}.` : `Invitation created for ${email}, but this server cannot send email.`),
+    ).then((r) => {
       if (r) form.reset();
     });
   };
@@ -109,7 +120,7 @@ export default function TeamPage() {
         </Panel>
 
         {canManage ? (
-          <Panel title="Add someone" hint="They must have created a Make Good account first. Invitations by email are not built yet.">
+          <Panel title="Invite someone" hint="They get an email with a link. It works once, for 7 days, and only for that address. They join when they accept.">
             <form onSubmit={add} className="flex flex-wrap items-end gap-3">
               <div className="min-w-64 flex-1">
                 <Field label="Their email" name="email" type="email" required />
@@ -125,9 +136,43 @@ export default function TeamPage() {
                 </Select>
               </div>
               <Button type="submit" disabled={pending}>
-                <UserPlus /> Add to the team
+                <UserPlus /> Send invitation
               </Button>
             </form>
+            {invitations.data && invitations.data.length > 0 ? (
+              <div className="mt-5">
+                <h3 className="mb-2 text-sm font-medium">Waiting to be accepted</h3>
+                <Table data-testid="invitations">
+                  <thead>
+                    <tr>
+                      <th>Email</th>
+                      <th>Role</th>
+                      <th>Expires</th>
+                      <th />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {invitations.data.map((i) => (
+                      <tr key={i.id}>
+                        <td>{i.email}</td>
+                        <td>{ROLE_LABELS[i.role]}</td>
+                        <td className="text-muted-foreground">{day(i.expires_at)}</td>
+                        <td className="text-right">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            disabled={pending}
+                            onClick={() => void run(() => api.delete(orgPath(org, `/invitations/${i.id}`)), `Invitation to ${i.email} withdrawn.`)}
+                          >
+                            Withdraw
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </Table>
+              </div>
+            ) : null}
           </Panel>
         ) : (
           <Alert tone="info">Only an owner or admin can change the team.</Alert>

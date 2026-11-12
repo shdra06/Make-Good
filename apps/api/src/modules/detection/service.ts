@@ -6,6 +6,7 @@
 // PayPal risk scores or complaint data, because no supported API gives us
 // those. Each finding says what it is based on and what it cannot tell.
 
+import { queueAlert } from "../notify/alerts.ts";
 import { audit } from "../../platform/audit.ts";
 import type { Clock } from "../../platform/clock.ts";
 import { DAY } from "../../platform/clock.ts";
@@ -66,15 +67,16 @@ export const DETECTORS = [
 ] as const;
 
 async function raise(tx: Queryable, orgId: string, finding: Finding, now: Date): Promise<boolean> {
-  const rows = await tx.query<{ created: boolean }>(
+  const rows = await tx.query<{ id: string; created: boolean }>(
     `insert into detections (org_id, detector, severity, title, summary, evidence, fingerprint, created_at, updated_at)
      values ($1,$2,$3,$4,$5,$6::jsonb,$7,$8,$8)
      on conflict (org_id, fingerprint) do update set
        severity = excluded.severity, title = excluded.title, summary = excluded.summary,
        evidence = excluded.evidence, updated_at = excluded.updated_at
-     returning (xmax = 0) as created`,
+     returning id, (xmax = 0) as created`,
     [orgId, finding.detector, finding.severity, finding.title, finding.summary, json(finding.evidence), finding.fingerprint, now.toISOString()],
   );
+  if (rows[0]?.created && finding.severity === "critical") await queueAlert(tx, orgId, { kind: "detection.raised", detectionId: rows[0].id }, now);
   return rows[0]?.created ?? false;
 }
 

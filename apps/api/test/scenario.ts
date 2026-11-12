@@ -2,6 +2,7 @@
 // a simulated PayPal account, a store with paid orders, and helpers to take an
 // incident from rules to a running batch.
 
+import { sendAlert } from "../src/modules/notify/alerts.ts";
 import { FakeClock } from "../src/platform/clock.ts";
 import type { Db } from "../src/platform/db/db.ts";
 import { JobRunner } from "../src/platform/jobs/queue.ts";
@@ -48,7 +49,12 @@ export async function scenario(options: { dualControl?: boolean } = {}) {
   );
   const deps = { db, clock };
   const executor = new OperationExecutor({ db, clock, providers: async () => paypal });
-  const runner = new JobRunner(db, executor.handlers(), { workerId: "test-worker", clock, concurrency: 4 });
+  // The same job types the server runs. Alerts go nowhere here: no mailer.
+  const runner = new JobRunner(
+    db,
+    { ...executor.handlers(), "staff.alert": (job) => sendAlert({ db, clock, mailer: null, publicUrl: "http://localhost:3000" }, job) },
+    { workerId: "test-worker", clock, concurrency: 4 },
+  );
   let orderSeq = 1000;
 
   /**

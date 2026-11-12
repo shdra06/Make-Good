@@ -1,24 +1,7 @@
 import { expect, test } from "@playwright/test";
-import fs from "node:fs/promises";
-import path from "node:path";
+import { linkFor } from "./outbox";
 
 const unique = () => Math.random().toString(36).slice(2, 10);
-
-/** The newest link of one kind in the emails the API wrote for this address. */
-async function linkFor(email: string, kind: "verify-email" | "reset-password"): Promise<string> {
-  const outbox = path.join(process.env.MG_E2E_DATA_DIR!, "outbox");
-  for (let attempt = 0; attempt < 20; attempt++) {
-    const names = (await fs.readdir(outbox).catch(() => [] as string[])).sort().reverse();
-    for (const name of names) {
-      const text = await fs.readFile(path.join(outbox, name), "utf8");
-      if (!text.includes(`To: ${email}`)) continue;
-      const match = text.match(new RegExp(String.raw`https?://\S+/${kind}/[A-Za-z0-9_-]+`));
-      if (match) return new URL(match[0]).pathname;
-    }
-    await new Promise((r) => setTimeout(r, 250));
-  }
-  throw new Error(`No ${kind} email for ${email}`);
-}
 
 test("a new account confirms its email from the link it was sent", async ({ page }) => {
   const email = `verify-${unique()}@mg.test`;

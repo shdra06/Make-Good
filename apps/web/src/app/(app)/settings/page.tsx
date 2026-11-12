@@ -108,6 +108,8 @@ function ApprovalForm({ org, settings, canManage }: { org: Membership; settings:
 
 function AiPanel({ org, settings, canManage, aiConfigured }: { org: Membership; settings: Settings; canManage: boolean; aiConfigured: boolean }) {
   const { run, pending } = useOrgAction([["org", org.orgId], ["me"]]);
+  // Shown at once; put back if the server refuses.
+  const [on, setOn] = useState(settings.aiEnabled);
   return (
     <Panel
       title="AI"
@@ -125,14 +127,18 @@ function AiPanel({ org, settings, canManage, aiConfigured }: { org: Membership; 
         <input
           type="checkbox"
           className="mt-1 size-4"
-          checked={settings.aiEnabled}
+          checked={on}
           disabled={!canManage || pending}
-          onChange={(e) =>
+          onChange={(e) => {
+            const next = e.target.checked;
+            setOn(next);
             void run(
-              () => api.patch(orgPath(org, "/settings"), { aiEnabled: e.target.checked }),
-              e.target.checked ? "AI is on for this workspace." : "AI is off. Notices are read by pattern rules.",
-            )
-          }
+              () => api.patch(orgPath(org, "/settings"), { aiEnabled: next }),
+              next ? "AI is on for this workspace." : "AI is off. Notices are read by pattern rules.",
+            ).then((r) => {
+              if (r === undefined) setOn(!next);
+            });
+          }}
         />
         <span>
           <span className="block text-sm font-medium">Use AI in this workspace</span>
