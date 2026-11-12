@@ -500,3 +500,22 @@ test("the API describes itself", async () => {
   assert.ok(rules.requestBody.content["application/json"].schema.properties.scope, "request bodies carry their schema");
   assert.equal((await h.client().get("/api/health")).body.ok, true);
 });
+
+test("rate limits are kept in the database, so a second server process sees the same count", async () => {
+  const h = await harness();
+  const anon = h.client();
+  for (let i = 0; i < 5; i++) assert.equal((await anon.post("/api/auth/password-reset", { email: `n${i}@example.com` })).status, 200);
+  const sixth = await anon.post("/api/auth/password-reset", { email: "n6@example.com" });
+  assert.equal(sixth.status, 429);
+  assert.ok(Number(sixth.headers["retry-after"]) > 0);
+
+  // A second API process on the same database.
+  const config = loadConfig({ NODE_ENV: "test", LOG_LEVEL: "silent", PUBLIC_URL: "http://localhost:4000" }, { readEnvFiles: false });
+  const other = buildApp(await createContainer(config, { db: h.db, clock: h.clock, passwordCost: { N: 1024, r: 8, p: 1 }, mailer: null }));
+  await other.app.ready();
+  const res = await other.app.inject({ method: "POST", url: "/api/auth/password-reset", payload: { email: "x@example.com" }, headers: { "x-make-good": "1" } });
+  assert.equal(res.statusCode, 429);
+
+  h.clock.advance(15 * 60_000 + 1000);
+  assert.equal((await anon.post("/api/auth/password-reset", { email: "later@example.com" })).status, 200, "a new window starts");
+});

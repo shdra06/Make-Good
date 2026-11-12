@@ -117,6 +117,7 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env, options: { r
       ? { clientId: env.PAYPAL_PARTNER_CLIENT_ID, clientSecret: env.PAYPAL_PARTNER_CLIENT_SECRET }
       : null;
 
+  if (env.EMAIL_TRANSPORT === "resend" && !env.RESEND_API_KEY) throw new Error("EMAIL_TRANSPORT is resend, so RESEND_API_KEY is required.");
   return {
     env: env.NODE_ENV,
     port: env.PORT,

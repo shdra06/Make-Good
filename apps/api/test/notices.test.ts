@@ -83,3 +83,24 @@ test("a held customer is emailed a one-time link; their answer is evidence only"
     /no email address/,
   );
 });
+
+test("Resend: an email is sent with its own ID as the idempotency key, and a refusal is an error", async () => {
+  const { ResendMailer } = await import("../src/modules/notify/mailer.ts");
+  const calls: { url: string; init: RequestInit }[] = [];
+  let status = 200;
+  const fakeFetch: typeof fetch = async (url, init) => {
+    calls.push({ url: String(url), init: init! });
+    return new Response(JSON.stringify(status === 200 ? { id: "re_123" } : { name: "validation_error", message: "domain not verified" }), { status });
+  };
+  const mailer = new ResendMailer({ apiKey: "re_test_key", from: "Kitchen Co <notices@example.com>", fetchImpl: fakeFetch });
+  const sent = await mailer.send({ id: "email-1", to: "maya@example.com\r\nBcc: x@evil.example", subject: "Your refund", text: "Hello", at: new Date() });
+  assert.equal(sent.ref, "resend/re_123");
+  assert.equal(calls[0]!.url, "https://api.resend.com/emails");
+  const headers = calls[0]!.init.headers as Record<string, string>;
+  assert.equal(headers["Idempotency-Key"], "email-1");
+  assert.equal(headers.Authorization, "Bearer re_test_key");
+  const body = JSON.parse(String(calls[0]!.init.body));
+  assert.deepEqual(body.to, ["maya@example.com Bcc: x@evil.example"], "no line break can add a header");
+  status = 422;
+  await assert.rejects(mailer.send({ id: "email-2", to: "a@example.com", subject: "s", text: "t", at: new Date() }), /domain not verified/);
+});

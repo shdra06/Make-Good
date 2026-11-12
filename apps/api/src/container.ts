@@ -17,7 +17,7 @@ import type { Deps as IdentityDeps } from "./modules/identity/service.ts";
 import { PayPalConnections } from "./modules/paypal/connections.ts";
 import { processProviderEvent } from "./modules/paypal/webhooks.ts";
 import { syncTransactions } from "./modules/transactions/sync.ts";
-import { FileMailer, type Mailer } from "./modules/notify/mailer.ts";
+import { FileMailer, ResendMailer, type Mailer } from "./modules/notify/mailer.ts";
 
 export type Container = {
   config: Config;
@@ -33,7 +33,7 @@ export type Container = {
   fx: FxService;
   runner: JobRunner;
   handlers: Record<string, JobHandler>;
-  /** Customer emails. Null when EMAIL_TRANSPORT asks for a transport that is not built (only "file" is). */
+  /** Where emails go: the file outbox, or Resend. */
   mailer: Mailer | null;
 };
 
@@ -57,6 +57,7 @@ export async function createContainer(config: Config, overrides: Overrides = {})
   const mailer: Mailer | null =
     overrides.mailer !== undefined ? overrides.mailer
     : config.email.transport === "file" ? new FileMailer({ dir: path.join(config.dataDir, "outbox"), from: config.email.from })
+    : config.email.resendApiKey ? new ResendMailer({ apiKey: config.email.resendApiKey, from: config.email.from, fetchImpl: overrides.fetchImpl })
     : null;
   const fx = new FxService({ db, clock, apiUrl: config.fxApiUrl, fetchImpl: overrides.fetchImpl });
 

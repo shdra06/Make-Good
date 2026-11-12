@@ -20,6 +20,9 @@ if (config.workerInline) {
 }
 
 await app.listen({ port: config.port, host: "0.0.0.0" });
+if (config.env === "production" && config.email.transport === "file") {
+  app.log.warn("EMAIL_TRANSPORT is file: emails are written to the outbox folder, not sent. Set EMAIL_TRANSPORT=resend and RESEND_API_KEY to send them.");
+}
 if (config.encryptionKeySource === "generated-for-development") {
   app.log.warn("Using a development encryption key from the data folder. Set MAKEGOOD_ENCRYPTION_KEY for anything real.");
 }

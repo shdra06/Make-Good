@@ -8,6 +8,7 @@
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from "fastify";
 import { z, ZodError } from "zod";
 import type { Config } from "../platform/config.ts";
+import type { Queryable } from "../platform/db/db.ts";
 import { AppError, ForbiddenError, RateLimitedError, UnauthenticatedError } from "../platform/errors.ts";
 import {
   requireMembership,
@@ -67,15 +68,23 @@ export function sessionCookie(token: string | null, expiresAt: Date | null, secu
   return token && expiresAt ? `${base}; Expires=${expiresAt.toUTCString()}` : `${base}; Max-Age=0`;
 }
 
-/** A small in-memory limiter. It is per process: put a shared one in front when running several instances. */
-class RateLimiter {
-  readonly #hits = new Map<string, number[]>();
-  check(key: string, max: number, windowMs: number, now: number): void {
-    const recent = (this.#hits.get(key) ?? []).filter((t) => now - t < windowMs);
-    if (recent.length >= max) throw new RateLimitedError(Math.ceil((windowMs - (now - recent[0]!)) / 1000));
-    recent.push(now);
-    this.#hits.set(key, recent);
-    if (this.#hits.size > 50_000) this.#hits.clear();
+/**
+ * Rate limits live in the database, so all server processes share them and a
+ * restart does not reset them. Fixed windows: at most `max` requests per key per window.
+ */
+export async function hitRateLimit(db: Queryable, key: string, max: number, windowMs: number, now: Date): Promise<void> {
+  const [row] = await db.query<{ hits: number; window_start: Date }>(
+    `insert into rate_limits (key, window_start, hits) values ($1, $2, 1)
+     on conflict (key) do update set
+       hits = case when rate_limits.window_start <= $3 then 1 else rate_limits.hits + 1 end,
+       window_start = case when rate_limits.window_start <= $3 then excluded.window_start else rate_limits.window_start end
+     returning hits, window_start`,
+    [key, now.toISOString(), new Date(now.getTime() - windowMs).toISOString()],
+  );
+  // Now and then, forget windows older than a day. No window here is longer than an hour.
+  if (Math.random() < 0.01) await db.query("delete from rate_limits where window_start < $1", [new Date(now.getTime() - 86_400_000).toISOString()]);
+  if (row && row.hits > max) {
+    throw new RateLimitedError(Math.max(1, Math.ceil((new Date(row.window_start).getTime() + windowMs - now.getTime()) / 1000)));
   }
 }
 
@@ -94,7 +103,6 @@ export function createRouter(input: { config: Config; identity: IdentityDeps; no
     bodyLimit: 5 * 1024 * 1024,
     trustProxy: true,
   });
-  const limiter = new RateLimiter();
   const registry: Registered[] = [];
 
   app.addHook("onSend", async (_req, reply) => {
@@ -164,7 +172,7 @@ export function createRouter(input: { config: Config; identity: IdentityDeps; no
       url: spec.path,
       handler: async (req, reply) => {
         const ip = req.ip;
-        if (spec.rateLimit) limiter.check(`${spec.method} ${spec.path} ${ip}`, spec.rateLimit.max, spec.rateLimit.windowMs, input.now().getTime());
+        if (spec.rateLimit) await hitRateLimit(identity.db, `${spec.method} ${spec.path} ${ip}`, spec.rateLimit.max, spec.rateLimit.windowMs, input.now());
 
         let user: SessionUser | null = null;
         let org: Membership | null = null;

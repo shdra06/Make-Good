@@ -46,6 +46,16 @@ services:
           property: connectionString
       - key: GEMINI_API_KEY
         sync: false
+      # Emails (password reset, verification, customer notices). "file" keeps
+      # them in the server's outbox folder and sends nothing. To send for real,
+      # set EMAIL_TRANSPORT to resend, add RESEND_API_KEY, and set EMAIL_FROM to
+      # an address on a domain verified with Resend.
+      - key: EMAIL_TRANSPORT
+        value: file
+      - key: RESEND_API_KEY
+        sync: false
+      - key: EMAIL_FROM
+        value: Make Good <notices@example.com>
       - key: LOG_LEVEL
         value: info
 
