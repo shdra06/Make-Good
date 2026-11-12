@@ -6,6 +6,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import { Logo } from "@/components/logo";
+import { VerifyBanner } from "@/components/verify-banner";
 import { Button } from "@/components/ui/button";
 import { Alert, Badge } from "@/components/ui/primitives";
 import { chooseOrg, useMe, useOrg, useSignOut } from "@/lib/session";
@@ -138,7 +139,10 @@ export function AppShell({ children }: { children: ReactNode }) {
             {server.aiConfigured ? <Badge tone="neutral">AI: {server.aiModel}</Badge> : <Badge tone="neutral">AI off</Badge>}
           </div>
         </header>
-        <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6">{children}</main>
+        <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6">
+          <VerifyBanner />
+          {children}
+        </main>
       </div>
     </div>
   );

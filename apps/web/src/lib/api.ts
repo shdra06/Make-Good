@@ -21,7 +21,12 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
     response = await fetch(path, {
       method,
       credentials: "same-origin",
-      headers: body === undefined ? { Accept: "application/json" } : { Accept: "application/json", "Content-Type": "application/json" },
+      headers: {
+        Accept: "application/json",
+        ...(body === undefined ? {} : { "Content-Type": "application/json" }),
+        // The API refuses a change without this header; a page on another site cannot add it. See CSRF in apps/api/src/api/http.ts.
+        ...(method === "GET" ? {} : { "X-Make-Good": "1" }),
+      },
       body: body === undefined ? undefined : JSON.stringify(body),
     });
   } catch {

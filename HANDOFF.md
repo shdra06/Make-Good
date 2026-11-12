@@ -104,4 +104,12 @@ Known loose end: another session's `integration/proposed-0002_…sql` (outside t
 
 ## Last session
 
-12 Nov 2026 (branch `production-grade`), step 3 done: new screens in the web app. Open an incident (`/incidents/new`, with an optional notice), attach a notice or set rules by hand on the Notice tab, Connections (PayPal REST app, simulator, check again, disconnect, copy transactions, stores and CSV import), Team (members, add by email, change role, what each role may do), Settings (four-eyes rule, approvals needed, large-list threshold, conversion cost). A workspace switcher appears when a user belongs to more than one. Screens hide what a role cannot do; the API still enforces it. Checks: 120 API tests, 10 Playwright tests, types, lint, format, build. Next: step 4, security (password reset, email verification, CSRF token, Content-Security-Policy, row-level security), then deploy to Render. Still missing: invitations by email, Shopify or WooCommerce connector, monitoring and analytics screens, the new demo video.
+12 Nov 2026 (branch `production-grade`), step 4 part 1 done: security.
+- Password reset (`/forgot-password`, `/reset-password/[token]`) and email verification (`/verify-email/[token]`, a banner until confirmed). Code: `apps/api/src/modules/identity/account.ts`, migration `0005_account_tokens.sql`. Tokens are hashed, one-time, and expire (reset 1 hour, verify 48 hours); at most 3 links an hour; a reset signs out every session; the reset form never says whether an account exists.
+- Emails go to the file outbox only (`DATA_DIR/outbox`). Outside production, links are also written to the API log so you can test locally.
+- CSRF: every POST, PATCH or DELETE (except webhooks and `/api/public`) must send `X-Make-Good: 1`, as well as pass the origin check. `apps/web/src/lib/api.ts` sends it.
+- Content-Security-Policy on the web app (`next.config.ts`) and the API, with HSTS in production.
+- `npm run dev` now works from any folder and keeps the API on 4000.
+- Checks: 124 API tests and 13 Playwright tests pass; types, lint, format and build are clean.
+
+Next: step 4 part 2, which is row-level security, encrypting customer names and emails, a real email transport (Resend), and a shared rate limiter. Then deploy to Render. Still missing: invitations by email, a Shopify or WooCommerce connector, monitoring and analytics screens, and the new demo video.

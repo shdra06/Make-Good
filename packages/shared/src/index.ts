@@ -37,7 +37,7 @@ export type ServerInfo = {
 };
 
 /** GET /api/me */
-export type Me = { user: SessionUser; organisations: Membership[]; server: ServerInfo };
+export type Me = { user: SessionUser & { emailVerified: boolean }; organisations: Membership[]; server: ServerInfo };
 
 /** Every error the API returns has this body. */
 export type ApiErrorBody = { error: { code: string; message: string; details?: unknown } };

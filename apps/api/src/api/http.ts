@@ -20,6 +20,8 @@ import {
 } from "../modules/identity/service.ts";
 
 export const SESSION_COOKIE = "mg_session";
+/** Sent by the web app on every request that changes something. See the CSRF hook below. */
+export const CSRF_HEADER = "x-make-good";
 
 export type AuthMode = "public" | "user" | { permission: Permission };
 
@@ -100,14 +102,24 @@ export function createRouter(input: { config: Config; identity: IdentityDeps; no
     reply.header("X-Frame-Options", "DENY");
     reply.header("Referrer-Policy", "same-origin");
     reply.header("Cache-Control", "no-store");
+    // The API serves JSON only: nothing in a reply may run, load or be framed.
+    reply.header("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'");
+    reply.header("Cross-Origin-Resource-Policy", "same-origin");
+    reply.header("Cross-Origin-Opener-Policy", "same-origin");
+    if (config.env === "production") reply.header("Strict-Transport-Security", "max-age=63072000; includeSubDomains");
   });
 
-  // Browsers attach cookies to requests from other sites. A request that changes
-  // something must come from our own pages. Webhooks and the public claim API
-  // carry no session and are checked in their own way.
+  // Cross-site request forgery. Browsers attach cookies to requests from other
+  // sites, so a request that changes something must prove it came from our own
+  // pages, in two ways:
+  // 1. It carries the header CSRF_HEADER. A page on another site cannot add a
+  //    custom header without a CORS preflight, and this API answers no preflight.
+  // 2. If the browser names an origin, it is ours.
+  // Webhooks and the public customer API carry no session and are checked in their own way.
   app.addHook("onRequest", async (req) => {
     if (req.method === "GET" || req.method === "HEAD" || req.method === "OPTIONS") return;
     if (req.url.startsWith("/api/webhooks/") || req.url.startsWith("/api/public/")) return;
+    if (req.headers[CSRF_HEADER] !== "1") throw new ForbiddenError(`Requests that change something must send the header ${CSRF_HEADER}: 1.`);
     const origin = req.headers.origin;
     if (!origin) return; // not a browser
     let host: string;

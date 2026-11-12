@@ -7,6 +7,7 @@ import { buildApp } from "../src/api/routes.ts";
 import { createContainer, type Container } from "../src/container.ts";
 import { FakeClock } from "../src/platform/clock.ts";
 import { loadConfig } from "../src/platform/config.ts";
+import type { Email, Mailer } from "../src/modules/notify/mailer.ts";
 import { testDb } from "./helpers.ts";
 
 type Reply = { status: number; body: any; headers: Record<string, unknown> };
@@ -34,7 +35,10 @@ async function harness() {
   const db = await testDb();
   const clock = new FakeClock("2026-11-10T09:00:00.000Z");
   const config = loadConfig({ NODE_ENV: "test", LOG_LEVEL: "silent", PUBLIC_URL: "http://localhost:4000" }, { readEnvFiles: false });
-  const container: Container = await createContainer(config, { db, clock, fetchImpl: fakeFetch, passwordCost: { N: 1024, r: 8, p: 1 } });
+  // Emails stay in memory, so tests can open the links in them.
+  const outbox: Email[] = [];
+  const mailer: Mailer = { transport: "file", send: async (email) => (outbox.push(email), { ref: `memory/${email.id}` }) };
+  const container: Container = await createContainer(config, { db, clock, fetchImpl: fakeFetch, passwordCost: { N: 1024, r: 8, p: 1 }, mailer });
   const { app, openapi } = buildApp(container);
   await app.ready();
 
@@ -43,7 +47,7 @@ async function harness() {
     const call = async (method: string, url: string, body?: unknown, headers: Record<string, string> = {}): Promise<Reply> => {
       const res = await app.inject({
         method: method as "GET", url, payload: body === undefined ? undefined : JSON.stringify(body),
-        headers: { ...(body === undefined ? {} : { "content-type": "application/json" }), ...(cookie ? { cookie } : {}), ...headers },
+        headers: { ...(body === undefined ? {} : { "content-type": "application/json" }), ...(method === "GET" ? {} : { "x-make-good": "1" }), ...(cookie ? { cookie } : {}), ...headers },
       });
       const set = res.headers["set-cookie"];
       if (set) cookie = String(Array.isArray(set) ? set[0] : set).split(";")[0]!;
@@ -78,7 +82,7 @@ async function harness() {
     }
     return { ...c, email, orgId };
   }
-  return { db, clock, container, app, openapi, client, person };
+  return { db, clock, container, app, openapi, client, person, outbox };
 }
 
 const RECALL_RULES = {
@@ -196,6 +200,77 @@ test("a request from another website is refused", async () => {
   assert.equal(res.status, 403);
   const ok = await ada.post(`/api/orgs/${ada.orgId}/paypal/simulator`, {}, { origin: "http://localhost:4000" });
   assert.equal(ok.status, 200);
+});
+
+test("a request that changes something must carry the anti-forgery header", async () => {
+  const h = await harness();
+  const ada = await h.person("Ada", "Kitchen Co");
+  const url = `/api/orgs/${ada.orgId}/paypal/simulator`;
+  const missing = await ada.call("POST", url, {}, { "x-make-good": "" });
+  assert.equal(missing.status, 403);
+  assert.match(missing.body.error.message, /x-make-good/);
+  assert.equal((await ada.call("POST", url, {}, { "x-make-good": "1" })).status, 200);
+  const anon = h.client();
+  assert.equal((await anon.call("POST", "/api/auth/login", { email: "ada@example.com", password: "correct horse battery" }, { "x-make-good": "" })).status, 403,
+    "a forged sign-in into the attacker's account is refused too");
+  const health = await anon.get("/api/health");
+  assert.match(String(health.headers["content-security-policy"]), /default-src 'none'/);
+});
+
+const linkToken = (email: Email, path: string) => email.text.split(`/${path}/`)[1]!.split(/\s/)[0]!;
+
+test("email verification: a link is sent on sign-up and works once", async () => {
+  const h = await harness();
+  const ada = await h.person("Ada", "Kitchen Co");
+  assert.equal((await ada.get("/api/me")).body.user.emailVerified, false);
+  const sent = h.outbox.filter((e) => e.to === "ada@example.com" && e.subject.includes("Confirm your email"));
+  assert.equal(sent.length, 1);
+  const token = linkToken(sent[0]!, "verify-email");
+  assert.equal(JSON.stringify(await h.db.query("select token_hash from account_tokens")).includes(token), false, "only the hash is stored");
+
+  const anon = h.client();
+  assert.equal((await anon.post("/api/auth/verify-email/confirm", { token })).status, 200);
+  assert.equal((await ada.get("/api/me")).body.user.emailVerified, true);
+  assert.equal((await anon.post("/api/auth/verify-email/confirm", { token })).status, 422, "a used link does not work again");
+  assert.equal((await ada.post("/api/auth/verify-email")).body.alreadyVerified, true);
+});
+
+test("email verification: a resent link expires and the resend is limited", async () => {
+  const h = await harness();
+  const bo = await h.person("Bo");
+  for (let i = 0; i < 2; i++) assert.equal((await bo.post("/api/auth/verify-email")).status, 200);
+  assert.equal((await bo.post("/api/auth/verify-email")).status, 409, "three links an hour at most, counting the one sent on sign-up");
+  const last = h.outbox.filter((e) => e.to === "bo@example.com").at(-1)!;
+  h.clock.advance(49 * 60 * 60_000);
+  assert.equal((await bo.post("/api/auth/verify-email/confirm", { token: linkToken(last, "verify-email") })).status, 422, "expired after 48 hours");
+});
+
+test("password reset: same reply for unknown emails, one-time link, every session signed out", async () => {
+  const h = await harness();
+  const ada = await h.person("Ada", "Kitchen Co");
+  const anon = h.client();
+  const before = h.outbox.length;
+  const unknown = await anon.post("/api/auth/password-reset", { email: "nobody@example.com" });
+  assert.equal(unknown.status, 200);
+  assert.equal(h.outbox.length, before, "no email for an account that does not exist");
+  const known = await anon.post("/api/auth/password-reset", { email: "ADA@example.com" });
+  assert.deepEqual(known.body, unknown.body, "the reply does not say whether the account exists");
+  const mail = h.outbox.at(-1)!;
+  assert.equal(mail.to, "ada@example.com");
+  const token = linkToken(mail, "reset-password");
+
+  assert.equal((await anon.post("/api/auth/password-reset/confirm", { token, password: "short" })).status, 422);
+  assert.equal((await anon.post("/api/auth/password-reset/confirm", { token, password: "a brand new passphrase" })).status, 200);
+  assert.equal((await ada.get("/api/me")).status, 401, "the old session is signed out");
+  assert.equal((await anon.post("/api/auth/login", { email: "ada@example.com", password: "correct horse battery" })).status, 401);
+  assert.equal((await anon.post("/api/auth/login", { email: "ada@example.com", password: "a brand new passphrase" })).status, 200);
+  assert.equal((await anon.get("/api/me")).body.user.emailVerified, true, "the reset link proved the address");
+  assert.equal((await anon.post("/api/auth/password-reset/confirm", { token, password: "yet another passphrase" })).status, 422, "the link works once");
+
+  await anon.post("/api/auth/password-reset", { email: "ada@example.com" });
+  const later = linkToken(h.outbox.at(-1)!, "reset-password");
+  h.clock.advance(61 * 60_000);
+  assert.equal((await anon.post("/api/auth/password-reset/confirm", { token: later, password: "yet another passphrase" })).status, 422, "expired after an hour");
 });
 
 test("a recall, start to finish, through the API", async () => {

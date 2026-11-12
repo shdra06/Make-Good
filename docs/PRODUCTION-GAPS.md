@@ -2,7 +2,7 @@
 
 Written 11 Nov 2026 on branch `production-grade`. No deadline is assumed. Every shortcut is listed, whatever the reason for it.
 
-**Progress (12 Nov 2026):** 1.1 to 1.6, 1.10, 1.11 and 9.1 are fixed on `production-grade` (Next.js app, TypeScript, components, routes, design tokens, real sign-up, Playwright in CI, workspaces). 1.7 is mostly fixed: dashboard, incidents, open an incident, the recall workflow, connections, team and roles, settings and a workspace switcher exist; monitoring and analytics screens, email invitations and a payments history page do not yet. 4.2 partly: basic security headers are set by the web app; no Content-Security-Policy yet.
+**Progress (12 Nov 2026):** 1.1 to 1.6, 1.10, 1.11 and 9.1 are fixed on `production-grade` (Next.js app, TypeScript, components, routes, design tokens, real sign-up, Playwright in CI, workspaces). 1.7 is mostly fixed: dashboard, incidents, open an incident, the recall workflow, connections, team and roles, settings and a workspace switcher exist; monitoring and analytics screens, email invitations and a payments history page do not yet. Step 4 (12 Nov): 4.1 partly (password reset and email verification built; no two-factor or Google sign-in), 4.2 fixed (CSP, HSTS in production, COOP on web and API; scripts still allow inline, see `apps/web/next.config.ts`), 4.3 fixed (every change needs the `X-Make-Good: 1` header plus the origin check), 4.7 fixed. Still open: 4.4, 4.5 (row-level security), 4.6 (customer PII encryption), and real email sending (only the file outbox exists).
 
 Each item says **why** it is the way it is:
 

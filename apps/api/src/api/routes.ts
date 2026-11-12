@@ -5,6 +5,7 @@ import { z } from "zod";
 import type { Container } from "../container.ts";
 import { DAY } from "../platform/clock.ts";
 import { ConflictError, NotConfiguredError, NotFoundError, ValidationError } from "../platform/errors.ts";
+import { NewPassword, requestPasswordReset, resetPassword, sendVerification, TokenOnly, verifyEmail, type LinkOutcome } from "../modules/identity/account.ts";
 import { emailConfirmLink, listNotices, notifyPaidCustomers } from "../modules/notify/notices.ts";
 import { enqueue } from "../platform/jobs/queue.ts";
 import { CSV_COLUMNS, ordersFromCsv } from "../modules/commerce/csv.ts";
@@ -64,7 +65,8 @@ export function buildApp(c: Container): Router {
     method: "POST", path: "/api/auth/register", summary: "Create an account", tag: "Auth", auth: "public", body: Registration,
     rateLimit: { max: 10, windowMs: 60 * 60_000 },
     handler: async ({ body, reply, ip, req }) => {
-      await registerUser(c.identity, body);
+      const created = await registerUser(c.identity, body);
+      devLink(req, await sendVerification(c.identity, c.mailer, { userId: created.id, publicUrl: c.config.publicUrl }).catch(() => ({ sent: false }) as LinkOutcome));
       const session = await signIn(c.identity, { email: body.email, password: body.password, ip, userAgent: req.headers["user-agent"] });
       reply.header("Set-Cookie", sessionCookie(session.token, session.expiresAt, secure));
       return { user: session.user };
@@ -87,10 +89,51 @@ export function buildApp(c: Container): Router {
       return { ok: true };
     },
   });
+  // Links in emails. Outside production the link is also written to the log, because the
+  // only email transport today writes files to the outbox folder instead of sending.
+  const devLink = (req: { log: { info: (o: object, m: string) => void } }, out: LinkOutcome) => {
+    if (out.url && c.config.env !== "production") req.log.info({ link: out.url }, "account email written to the outbox");
+  };
+  route({
+    method: "POST", path: "/api/auth/password-reset", summary: "Email a password-reset link. The reply is the same whether or not the account exists.",
+    tag: "Auth", auth: "public", body: z.object({ email: z.string().trim().email().max(320) }), rateLimit: { max: 5, windowMs: 15 * 60_000 },
+    handler: async ({ body, req }) => {
+      devLink(req, await requestPasswordReset(c.identity, c.mailer, { email: body.email, publicUrl: c.config.publicUrl }));
+      return { ok: true };
+    },
+  });
+  route({
+    method: "POST", path: "/api/auth/password-reset/confirm", summary: "Set a new password with a reset link. Signs out every session.",
+    tag: "Auth", auth: "public", body: NewPassword, rateLimit: { max: 10, windowMs: 15 * 60_000 },
+    handler: async ({ body, reply }) => {
+      await resetPassword(c.identity, body);
+      reply.header("Set-Cookie", sessionCookie(null, null, secure));
+      return { ok: true };
+    },
+  });
+  route({
+    method: "POST", path: "/api/auth/verify-email", summary: "Email a new verification link to the signed-in user",
+    tag: "Auth", auth: "user", rateLimit: { max: 5, windowMs: 15 * 60_000 },
+    handler: async ({ user, req }) => {
+      const out = await sendVerification(c.identity, c.mailer, { userId: user.id, publicUrl: c.config.publicUrl });
+      devLink(req, out);
+      if (out.reason === "rate_limited") throw new ConflictError("TOO_MANY_LINKS", "Three links were sent in the last hour. Use the newest one, or wait.");
+      if (out.reason === "no_mailer") throw new NotConfiguredError("EMAIL_NOT_CONFIGURED", "Email is not set up on this server.");
+      return { sent: out.sent, alreadyVerified: out.reason === "already_verified" };
+    },
+  });
+  route({
+    method: "POST", path: "/api/auth/verify-email/confirm", summary: "Confirm an email address with the link that was sent to it",
+    tag: "Auth", auth: "public", body: TokenOnly, rateLimit: { max: 20, windowMs: 15 * 60_000 },
+    handler: async ({ body }) => verifyEmail(c.identity, body.token),
+  });
   route({
     method: "GET", path: "/api/me", summary: "The signed-in user, their organisations and what this server can do", tag: "Auth", auth: "user",
     handler: async ({ user }) => ({
-      user,
+      user: {
+        ...user,
+        emailVerified: Boolean((await c.db.query<{ v: Date | null }>("select email_verified_at as v from users where id = $1", [user.id]))[0]?.v),
+      },
       organisations: (await membershipsOf(c.identity, user.id)).map((m) => ({ ...m, permissions: permissionsOf(m.role) })),
       server: {
         simulatorAllowed: c.config.allowSimulator,

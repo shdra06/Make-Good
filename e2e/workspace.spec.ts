@@ -120,7 +120,8 @@ test("an owner adds a teammate, changes their role, and the teammate sees only w
   });
   expect(lenaOrg).toBeTruthy();
   const settings = await m.evaluate(
-    async (id) => (await fetch(`/api/orgs/${id}/settings`, { method: "PATCH", headers: { "content-type": "application/json" }, body: "{}" })).status,
+    async (id) =>
+      (await fetch(`/api/orgs/${id}/settings`, { method: "PATCH", headers: { "content-type": "application/json", "x-make-good": "1" }, body: "{}" })).status,
     lenaOrg,
   );
   expect(settings, "a viewer cannot change settings").toBe(403);

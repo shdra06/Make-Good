@@ -37,6 +37,9 @@ function SignInForm() {
         <form onSubmit={submit} className="flex flex-col gap-4">
           <Field label="Email" name="email" type="email" autoComplete="username" required />
           <Field label="Password" name="password" type="password" autoComplete="current-password" required />
+          <Link href="/forgot-password" className="-mt-2 w-fit text-sm text-primary hover:underline">
+            Forgot your password?
+          </Link>
           {signIn.error ? <Alert>{signIn.error.message}</Alert> : null}
           <Button type="submit" disabled={signIn.isPending}>
             {signIn.isPending ? <Loader2 className="animate-spin" /> : null}

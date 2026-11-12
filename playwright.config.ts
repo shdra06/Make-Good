@@ -8,7 +8,8 @@ import path from "node:path";
 
 const API_PORT = 4100;
 const WEB_PORT = 3100;
-const dataDir = path.join(os.tmpdir(), `makegood-e2e-${process.pid}`);
+// Kept in the environment so test workers can read the emails the API writes to DATA_DIR/outbox.
+const dataDir = (process.env.MG_E2E_DATA_DIR ??= path.join(os.tmpdir(), `makegood-e2e-${process.pid}`));
 
 export default defineConfig({
   testDir: "./e2e",
