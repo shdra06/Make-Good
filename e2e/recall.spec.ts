@@ -25,7 +25,7 @@ test("a recall from notice to PayPal-confirmed refunds", async ({ page }) => {
 
   // Demo shop and the recall case
   await page.goto("/");
-  await page.getByRole("button", { name: "Open the recall demo" }).click();
+  await page.getByRole("button", { name: "Open the recall demo" }).first().click();
   await expect(page).toHaveURL(/\/incidents\/[0-9a-f-]{36}\/notice$/, { timeout: 60_000 });
   await expect(page.getByText("PayPal: simulator, no real money")).toBeVisible();
   await expect(page.getByText("Records: synthetic (invented)")).toBeVisible();

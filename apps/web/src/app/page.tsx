@@ -1,105 +1,145 @@
-import { CheckCircle2, FileSearch, ListChecks, ShieldCheck } from "lucide-react";
+import { ArrowRight, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { DemoButton } from "@/components/demo-button";
+import { HeroVisual } from "@/components/landing/hero-visual";
+import { Bento, MotionRoot, Reveal, Screens, Stats, Story } from "@/components/landing/sections";
 import { Logo } from "@/components/logo";
 import { Button } from "@/components/ui/button";
 
-const STEPS = [
-  {
-    icon: FileSearch,
-    title: "Read the supplier's notice",
-    text: "The recall notice becomes rules a person checks: which products, which batches, which dates. Every rule quotes the notice.",
-  },
-  {
-    icon: ListChecks,
-    title: "Find who received the batch",
-    text: "For every buyer, two separate answers: is this their PayPal payment, and was their unit affected? Unclear records are held, not paid.",
-  },
-  {
-    icon: ShieldCheck,
-    title: "Approve one exact list",
-    text: "An approval covers one versioned payment list. If a customer, rule or balance changes, the approval is withdrawn.",
-  },
-  {
-    icon: CheckCircle2,
-    title: "Refund through PayPal, once",
-    text: "Each refund carries a fixed request ID, so a lost reply is asked again, never paid twice. Only PayPal-confirmed payments show as paid.",
-  },
-];
+function SectionTitle({ eyebrow, title, text }: { eyebrow: string; title: string; text: string }) {
+  return (
+    <Reveal className="mx-auto mb-12 max-w-2xl text-center">
+      <p className="text-sm font-medium tracking-wider text-primary uppercase">{eyebrow}</p>
+      <h2 className="mt-2 text-3xl font-semibold tracking-tight text-balance sm:text-4xl">{title}</h2>
+      <p className="mt-3 text-muted-foreground text-pretty">{text}</p>
+    </Reveal>
+  );
+}
 
 export default function Home() {
   return (
-    <div className="flex min-h-dvh flex-col">
-      <header className="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-5 sm:px-6">
-        <Logo />
-        <nav className="flex items-center gap-2">
-          <Button variant="ghost" asChild>
-            <Link href="/sign-in">Sign in</Link>
-          </Button>
-          <Button variant="outline" asChild>
-            <Link href="/sign-up">Create account</Link>
-          </Button>
-        </nav>
-      </header>
+    <MotionRoot>
+      <div className="relative flex min-h-dvh flex-col overflow-x-clip">
+        {/* Soft light behind the top of the page. */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[720px] bg-[radial-gradient(60%_50%_at_20%_0%,color-mix(in_oklch,var(--primary)_18%,transparent),transparent),radial-gradient(50%_40%_at_90%_10%,color-mix(in_oklch,var(--info)_16%,transparent),transparent)]"
+        />
 
-      <main className="mx-auto w-full max-w-6xl flex-1 px-4 sm:px-6">
-        <section className="grid gap-10 py-14 lg:grid-cols-[1.2fr_1fr] lg:items-center lg:py-24">
-          <div className="flex flex-col gap-6">
-            <p className="text-sm font-medium uppercase tracking-wider text-primary">Product recalls, refunded through PayPal</p>
-            <h1 className="text-4xl font-semibold tracking-tight text-balance sm:text-5xl">Who is owed money, why, how much, and what was actually paid.</h1>
-            <p className="max-w-xl text-lg text-muted-foreground text-pretty">
-              When a supplier recalls one batch, refunding is the easy part. Working out which customers received that batch, from records that never quite
-              agree, is the hard part. Make Good does that part in the open.
-            </p>
-            <div className="flex flex-wrap items-start gap-3">
-              <DemoButton />
-              <Button size="lg" variant="outline" asChild>
-                <Link href="/sign-up">Start with your own shop</Link>
+        <header className="sticky top-0 z-40 border-b border-transparent bg-background/70 backdrop-blur-md supports-[backdrop-filter]:bg-background/50">
+          <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-4 sm:px-6">
+            <Logo />
+            <nav className="flex items-center gap-1 sm:gap-2">
+              <Button variant="ghost" asChild className="hidden sm:inline-flex">
+                <a href="#how">How it works</a>
               </Button>
-            </div>
-            <p className="text-sm text-muted-foreground">
-              The demo loads 32 invented orders on a built-in PayPal simulator. No real money and no real customers.
-            </p>
+              <Button variant="ghost" asChild>
+                <Link href="/sign-in">Sign in</Link>
+              </Button>
+              <Button asChild>
+                <Link href="/sign-up">Create account</Link>
+              </Button>
+            </nav>
           </div>
-          <div className="rounded-xl border bg-card p-6 shadow-sm">
-            <p className="text-sm font-medium text-muted-foreground">Recall: batch B-2217, HM-300 hand mixer</p>
-            <dl className="mt-4 grid grid-cols-2 gap-4">
-              {[
-                ["Affected units", "23"],
-                ["Proven from records", "20"],
-                ["Held for a person", "5"],
-                ["Paid twice", "0"],
-              ].map(([label, value]) => (
-                <div key={label} className="rounded-lg bg-muted p-4">
-                  <dt className="text-xs text-muted-foreground">{label}</dt>
-                  <dd className="mt-1 text-2xl font-semibold tabular-nums">{value}</dd>
-                </div>
-              ))}
-            </dl>
-            <p className="mt-4 text-xs text-muted-foreground">Figures from the demo case, measured against answers fixed in advance.</p>
-          </div>
-        </section>
+        </header>
 
-        <section className="grid gap-4 pb-20 sm:grid-cols-2 lg:grid-cols-4">
-          {STEPS.map(({ icon: Icon, title, text }, i) => (
-            <div key={title} className="rounded-xl border bg-card p-5">
-              <div className="flex items-center gap-2 text-primary">
-                <Icon className="size-5" aria-hidden />
-                <span className="text-xs font-semibold">Step {i + 1}</span>
+        <main className="mx-auto w-full max-w-6xl flex-1 px-4 sm:px-6">
+          <section className="grid gap-12 pt-12 pb-16 lg:grid-cols-[1fr_1.1fr] lg:items-center lg:pt-20 lg:pb-24">
+            {/* Not animated: the headline is the first thing a visitor should see. */}
+            <div className="flex flex-col gap-6">
+              <span className="inline-flex w-fit items-center gap-2 rounded-full border bg-card/60 px-3 py-1 text-xs font-medium text-muted-foreground backdrop-blur">
+                <span className="size-1.5 rounded-full bg-ok" /> Product recalls, refunded through PayPal
+              </span>
+              <h1 className="text-4xl font-semibold tracking-tight text-balance sm:text-5xl lg:text-6xl">
+                Who is owed money, why, how much, and{" "}
+                <span className="bg-gradient-to-r from-primary to-info bg-clip-text text-transparent">what was actually paid.</span>
+              </h1>
+              <p className="max-w-xl text-lg text-muted-foreground text-pretty">
+                When a supplier recalls one batch, refunding is the easy part. Working out which customers received that batch, from records that never quite
+                agree, is the hard part. Make Good does that part in the open.
+              </p>
+              <div className="flex flex-wrap items-start gap-3">
+                <DemoButton />
+                <Button size="lg" variant="outline" asChild>
+                  <Link href="/sign-up">Start with your own shop</Link>
+                </Button>
               </div>
-              <h2 className="mt-3 font-semibold">{title}</h2>
-              <p className="mt-1 text-sm text-muted-foreground">{text}</p>
+              <p className="flex items-center gap-2 text-sm text-muted-foreground">
+                <ShieldCheck className="size-4 text-ok" aria-hidden />
+                The demo uses 32 invented orders on a built-in PayPal simulator. No real money, no real customers.
+              </p>
             </div>
-          ))}
-        </section>
-      </main>
+            <Reveal delay={0.15}>
+              <HeroVisual />
+            </Reveal>
+          </section>
 
-      <footer className="border-t">
-        <div className="mx-auto flex max-w-6xl flex-wrap justify-between gap-2 px-4 py-6 text-sm text-muted-foreground sm:px-6">
-          <span>Make Good. PayPal sandbox and simulator only; live payments are switched off.</span>
-          <span>AI proposes, people decide.</span>
-        </div>
-      </footer>
-    </div>
+          <section className="pb-24">
+            <Reveal>
+              <Stats />
+            </Reveal>
+            <p className="mt-3 text-center text-xs text-muted-foreground">From the demo case, measured against answers fixed in advance.</p>
+          </section>
+
+          <section className="pb-28">
+            <SectionTitle
+              eyebrow="The product"
+              title="Every decision on one screen, and its reason next to it"
+              text="Matching, approval and payment, each showing why. Move your mouse over the screens."
+            />
+            <Screens />
+            <p className="mt-10 text-center text-xs text-muted-foreground">Simplified drawings of the app&apos;s screens. Names are invented.</p>
+          </section>
+
+          <section id="how" className="scroll-mt-24 pb-28">
+            <SectionTitle
+              eyebrow="How it works"
+              title="From a supplier's notice to PayPal-confirmed refunds"
+              text="Four steps. A person decides at every one that matters."
+            />
+            <Story />
+          </section>
+
+          <section className="pb-28">
+            <SectionTitle
+              eyebrow="Why it can be trusted"
+              title="Built for the day money moves"
+              text="The hard parts of a refund run are not the refunds. They are the duplicates, the guesses and the missing records."
+            />
+            <Bento />
+          </section>
+
+          <section className="pb-24">
+            <Reveal>
+              <div className="relative overflow-hidden rounded-3xl border bg-card px-6 py-14 text-center sm:px-12">
+                <div
+                  aria-hidden
+                  className="pointer-events-none absolute inset-0 bg-[radial-gradient(50%_80%_at_50%_100%,color-mix(in_oklch,var(--primary)_22%,transparent),transparent)]"
+                />
+                <h2 className="relative text-3xl font-semibold tracking-tight text-balance sm:text-4xl">See a whole recall in two minutes</h2>
+                <p className="relative mx-auto mt-3 max-w-xl text-muted-foreground">
+                  The demo opens a shop with a recalled hand mixer, 32 orders and a PayPal simulator. Walk it from the notice to confirmed refunds.
+                </p>
+                <div className="relative mt-8 flex flex-wrap justify-center gap-3">
+                  <DemoButton />
+                  <Button size="lg" variant="ghost" asChild>
+                    <Link href="/sign-up">
+                      Create an account <ArrowRight />
+                    </Link>
+                  </Button>
+                </div>
+              </div>
+            </Reveal>
+          </section>
+        </main>
+
+        <footer className="border-t">
+          <div className="mx-auto flex max-w-6xl flex-wrap justify-between gap-2 px-4 py-6 text-sm text-muted-foreground sm:px-6">
+            <span>Make Good. PayPal sandbox and simulator only; live payments are switched off.</span>
+            <span>AI proposes, people decide.</span>
+          </div>
+        </footer>
+      </div>
+    </MotionRoot>
   );
 }

@@ -21,7 +21,8 @@ export default function SignUpPage() {
       await api.post("/api/orgs", { name: body.shop });
     },
     onSuccess: async () => {
-      await client.invalidateQueries({ queryKey: ["me"] });
+      // Forget any "signed out" answer from before, so the app asks again instead of sending you back here.
+      client.removeQueries({ queryKey: ["me"] });
       router.replace("/dashboard");
     },
   });

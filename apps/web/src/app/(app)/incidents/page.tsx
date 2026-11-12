@@ -1,11 +1,12 @@
 "use client";
 
-import { Loader2, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { allowed } from "@/lib/org-action";
 import { useOrg } from "@/lib/session";
 import { IncidentTable } from "@/components/incident-table";
+import { TableSkeleton } from "@/components/ui/skeleton";
 import { PageHeader } from "@/components/page-header";
 import { Alert, Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/primitives";
 import { useIncidents } from "@/lib/incidents";
@@ -29,7 +30,7 @@ export default function IncidentsPage() {
         }
       />
       {incidents.isPending ? (
-        <Loader2 className="size-5 animate-spin text-muted-foreground" aria-label="Loading" />
+        <TableSkeleton />
       ) : incidents.isError ? (
         <Alert>{incidents.error.message}</Alert>
       ) : incidents.data.length === 0 ? (

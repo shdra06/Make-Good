@@ -104,12 +104,12 @@ Known loose end: another session's `integration/proposed-0002_…sql` (outside t
 
 ## Last session
 
-12 Nov 2026 (branch `production-grade`), step 4 part 1 done: security.
-- Password reset (`/forgot-password`, `/reset-password/[token]`) and email verification (`/verify-email/[token]`, a banner until confirmed). Code: `apps/api/src/modules/identity/account.ts`, migration `0005_account_tokens.sql`. Tokens are hashed, one-time, and expire (reset 1 hour, verify 48 hours); at most 3 links an hour; a reset signs out every session; the reset form never says whether an account exists.
-- Emails go to the file outbox only (`DATA_DIR/outbox`). Outside production, links are also written to the API log so you can test locally.
-- CSRF: every POST, PATCH or DELETE (except webhooks and `/api/public`) must send `X-Make-Good: 1`, as well as pass the origin check. `apps/web/src/lib/api.ts` sends it.
-- Content-Security-Policy on the web app (`next.config.ts`) and the API, with HSTS in production.
-- `npm run dev` now works from any folder and keeps the API on 4000.
-- Checks: 124 API tests and 13 Playwright tests pass; types, lint, format and build are clean.
+12 Nov 2026 (branch `production-grade`), new landing page and app polish, done before step 4 part 2:
+- Landing (`apps/web/src/app/page.tsx`, `src/components/landing/`): a Three.js hero (`recall-scene.tsx`) that plays the demo case in a loop (32 orders, 23 found, 5 held, 20 refunds through PayPal, customers turn green on PayPal's confirmation). It also has count-up numbers, tilted app screens that follow the mouse, a scroll timeline of the four steps, a bento grid of strengths and a final call to action.
+- Three.js loads only in the browser, as a separate chunk of about 238 KB compressed. The 3D pauses when off screen. With "reduce motion" it shows one still frame of the end state. Without WebGL it shows a plain fallback.
+- App: pages fade in (`(app)/template.tsx`), loading skeletons (`ui/skeleton.tsx`), and a "Create your workspace" screen for an account with no workspace (the dashboard used to spin forever).
+- Bug fixed: after signing out and in again, the app could send you back to sign-in because it had kept the old "signed out" answer.
+- Libraries: three 0.187.0, @react-three/fiber 9.8.2, motion 14.12.0 (pinned).
+- Checks: 14 Playwright tests (1 new), types, lint, format and build. API untouched (124 tests, as last run).
 
 Next: step 4 part 2, which is row-level security, encrypting customer names and emails, a real email transport (Resend), and a shared rate limiter. Then deploy to Render. Still missing: invitations by email, a Shopify or WooCommerce connector, monitoring and analytics screens, and the new demo video.

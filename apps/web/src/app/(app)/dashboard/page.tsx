@@ -1,22 +1,33 @@
 "use client";
 
-import { Loader2 } from "lucide-react";
 import Link from "next/link";
 import { IncidentTable } from "@/components/incident-table";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Alert, Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/primitives";
 import { useIncidents } from "@/lib/incidents";
-import { useMe } from "@/lib/session";
+import { CreateWorkspace } from "@/components/create-workspace";
+import { Skeleton, TableSkeleton } from "@/components/ui/skeleton";
+import { useMe, useOrg } from "@/lib/session";
 
 export default function DashboardPage() {
   const me = useMe();
+  const org = useOrg();
   const incidents = useIncidents();
   const rows = incidents.data ?? [];
   const totals = rows.reduce(
     (t, r) => ({ open: t.open + (r.status === "active" || r.status === "draft" ? 1 : 0), awaiting: t.awaiting + r.awaiting, paid: t.paid + r.paid }),
     { open: 0, awaiting: 0, paid: 0 },
   );
+
+  if (me.data && !org) {
+    return (
+      <>
+        <PageHeader title={`Hello, ${me.data.user.name.split(" ")[0] ?? ""}`} description="One step before the dashboard." />
+        <CreateWorkspace />
+      </>
+    );
+  }
 
   return (
     <>
@@ -31,7 +42,7 @@ export default function DashboardPage() {
           <Card key={label}>
             <CardHeader>
               <CardDescription>{label}</CardDescription>
-              <CardTitle className="text-3xl tabular-nums">{incidents.isPending ? "–" : value}</CardTitle>
+              <CardTitle className="text-3xl tabular-nums">{incidents.isPending ? <Skeleton className="h-9 w-14" /> : value}</CardTitle>
             </CardHeader>
           </Card>
         ))}
@@ -39,7 +50,7 @@ export default function DashboardPage() {
 
       <h2 className="mb-3 text-lg font-semibold">Recent incidents</h2>
       {incidents.isPending ? (
-        <Loader2 className="size-5 animate-spin text-muted-foreground" aria-label="Loading" />
+        <TableSkeleton />
       ) : incidents.isError ? (
         <Alert>{incidents.error.message}</Alert>
       ) : rows.length === 0 ? (

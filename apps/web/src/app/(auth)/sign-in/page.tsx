@@ -17,7 +17,8 @@ function SignInForm() {
   const signIn = useMutation({
     mutationFn: (body: { email: string; password: string }) => api.post("/api/auth/login", body),
     onSuccess: async () => {
-      await client.invalidateQueries({ queryKey: ["me"] });
+      // Forget any "signed out" answer from before, so the app asks again instead of sending you back here.
+      client.removeQueries({ queryKey: ["me"] });
       // Only same-site paths: never send someone to another site after sign-in.
       router.replace(next && next.startsWith("/") && !next.startsWith("//") ? next : "/dashboard");
     },

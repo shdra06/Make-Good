@@ -5,7 +5,7 @@ const unique = () => Math.random().toString(36).slice(2, 10);
 test("the home page explains the product and offers the demo", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("heading", { level: 1 })).toContainText("Who is owed money");
-  await expect(page.getByRole("button", { name: "Open the recall demo" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Open the recall demo" }).first()).toBeVisible();
   await expect(page.getByRole("link", { name: "Sign in" })).toBeVisible();
 });
 
@@ -57,7 +57,7 @@ test("sign-up refuses a short password before sending anything", async ({ page }
 
 test("the demo opens the recall case inside the app", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("button", { name: "Open the recall demo" }).click();
+  await page.getByRole("button", { name: "Open the recall demo" }).first().click();
   await expect(page).toHaveURL(/\/incidents\/[0-9a-f-]{36}\/notice$/, { timeout: 60_000 });
   await expect(page.getByRole("heading", { level: 1 })).toContainText("HM-300");
   await page.getByRole("link", { name: "Dashboard" }).click();
@@ -67,4 +67,16 @@ test("the demo opens the recall case inside the app", async ({ page }) => {
 test("an unknown page shows a clear not-found page", async ({ page }) => {
   await page.goto("/no-such-page");
   await expect(page.getByRole("heading", { name: "This page does not exist" })).toBeVisible();
+});
+
+test("the landing page draws the 3D recall, and shows its end state when motion is reduced", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.locator("canvas")).toHaveCount(1);
+  await expect(page.getByRole("img", { name: /20 refunds flow through PayPal/ })).toBeVisible();
+  await expect(page.getByText(/affected orders found/)).toBeVisible();
+
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.reload();
+  await expect(page.locator("canvas")).toHaveCount(1);
+  await expect(page.getByText("PayPal confirmed.")).toBeVisible();
 });
