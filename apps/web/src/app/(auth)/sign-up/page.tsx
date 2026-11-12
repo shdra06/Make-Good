@@ -48,6 +48,17 @@ export default function SignUpPage() {
             {signUp.isPending ? <Loader2 className="animate-spin" /> : null}
             Create account
           </Button>
+          <p className="text-center text-xs text-muted-foreground">
+            By creating an account you agree to the{" "}
+            <Link href="/terms" className="underline">
+              terms
+            </Link>{" "}
+            and the{" "}
+            <Link href="/privacy" className="underline">
+              privacy notice
+            </Link>
+            .
+          </p>
           <p className="text-center text-sm text-muted-foreground">
             Already have an account?{" "}
             <Link href="/sign-in" className="font-medium text-primary hover:underline">

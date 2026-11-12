@@ -136,7 +136,17 @@ export default function Home() {
         <footer className="border-t">
           <div className="mx-auto flex max-w-6xl flex-wrap justify-between gap-2 px-4 py-6 text-sm text-muted-foreground sm:px-6">
             <span>Make Good. PayPal sandbox and simulator only; live payments are switched off.</span>
-            <span>AI proposes, people decide.</span>
+            <nav className="flex gap-4">
+              <Link href="/privacy" className="hover:text-foreground">
+                Privacy
+              </Link>
+              <Link href="/terms" className="hover:text-foreground">
+                Terms
+              </Link>
+              <Link href="/ai" className="hover:text-foreground">
+                How AI is used
+              </Link>
+            </nav>
           </div>
         </footer>
       </div>

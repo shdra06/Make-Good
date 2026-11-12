@@ -18,6 +18,7 @@ import { PayPalConnections } from "./modules/paypal/connections.ts";
 import { processProviderEvent } from "./modules/paypal/webhooks.ts";
 import { syncTransactions } from "./modules/transactions/sync.ts";
 import { Pii } from "./platform/pii.ts";
+import { createErrorLog, type ErrorLog } from "./platform/error-log.ts";
 import { sealExistingCustomerData } from "./platform/pii-backfill.ts";
 import { FileMailer, ResendMailer, type Mailer } from "./modules/notify/mailer.ts";
 
@@ -37,6 +38,8 @@ export type Container = {
   handlers: Record<string, JobHandler>;
   /** Where emails go: the file outbox, or Resend. */
   mailer: Mailer | null;
+  /** Records server errors and failed jobs (Monitoring screen, optional webhook). */
+  errorLog: ErrorLog;
 };
 
 export type Overrides = { db?: Db; clock?: Clock; fetchImpl?: typeof fetch; passwordCost?: ScryptCost; workerId?: string; ai?: EvidenceAi | null; mailer?: Mailer | null };
@@ -82,16 +85,18 @@ export async function createContainer(config: Config, overrides: Overrides = {})
       await runDetectors(deps, job.org_id!);
     },
   };
+  const errorLog = createErrorLog({ db, webhookUrl: config.errorWebhookUrl, fetchImpl: overrides.fetchImpl, now: () => clock.now() });
   const runner = new JobRunner(db, handlers, {
     workerId: overrides.workerId ?? `worker-${process.pid}`,
     clock,
     onError: (job, err) => {
       if (config.logLevel !== "silent") console.error(`[jobs] ${job.type} ${job.id} failed:`, err instanceof Error ? err.message : err);
+      void errorLog({ source: "job", where: job.type || "job runner", orgId: job.org_id, error: err });
     },
   });
 
   return {
-    config, db, clock, deps, ai, secrets, connections, executor, fx, runner, handlers, mailer,
+    config, db, clock, deps, ai, secrets, connections, executor, fx, runner, handlers, mailer, errorLog,
     identity: { db, clock, passwordCost: overrides.passwordCost },
   };
 }

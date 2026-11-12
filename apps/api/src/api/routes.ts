@@ -3,6 +3,8 @@
 
 import { z } from "zod";
 import type { Container } from "../container.ts";
+import { audit } from "../platform/audit.ts";
+import { exportWorkspace } from "../platform/export.ts";
 import { DAY } from "../platform/clock.ts";
 import { ConflictError, NotConfiguredError, NotFoundError, ValidationError } from "../platform/errors.ts";
 import { NewPassword, requestPasswordReset, resetPassword, sendVerification, TokenOnly, verifyEmail, type LinkOutcome } from "../modules/identity/account.ts";
@@ -44,9 +46,11 @@ const Incident = OrgParams.extend({ incidentId: uuid });
 const Batch = OrgParams.extend({ batchId: uuid });
 
 export function buildApp(c: Container): Router {
-  const router = createRouter({ config: c.config, identity: c.identity, now: () => c.clock.now() });
+  const router = createRouter({ config: c.config, identity: c.identity, now: () => c.clock.now(), errorLog: c.errorLog });
   const { route, app } = router;
   const secure = c.config.env === "production";
+  /** The AI, unless this workspace switched it off in Settings. */
+  const aiFor = (org: { settings: { aiEnabled: boolean } }) => (org.settings.aiEnabled ? c.ai : null);
 
   // ---------- service ----------
 
@@ -427,7 +431,7 @@ export function buildApp(c: Container): Router {
   route({
     method: "POST", path: "/api/orgs/:orgId/candidates/:candidateId/explain", summary: "Gemini explains, from the stored evidence only, why this record is held (needs an API key)", tag: "Evidence",
     auth: { permission: "org.read" }, params: OrgParams.extend({ candidateId: uuid }),
-    handler: async ({ params, org }) => explainCandidate({ ...c.deps, ai: c.ai }, { orgId: org.orgId, candidateId: params.candidateId }),
+    handler: async ({ params, org }) => explainCandidate({ ...c.deps, ai: aiFor(org) }, { orgId: org.orgId, candidateId: params.candidateId }),
   });
 
   route({
@@ -496,35 +500,35 @@ export function buildApp(c: Container): Router {
   route({
     method: "GET", path: "/api/orgs/:orgId/incidents/:incidentId/evidence", summary: "Documents attached to the incident and what was read from them", tag: "Evidence",
     auth: { permission: "org.read" }, params: Incident,
-    handler: async ({ params, org }) => listEvidence({ ...c.deps, ai: c.ai }, org.orgId, params.incidentId),
+    handler: async ({ params, org }) => listEvidence({ ...c.deps, ai: aiFor(org) }, org.orgId, params.incidentId),
   });
   route({
     method: "POST", path: "/api/orgs/:orgId/incidents/:incidentId/documents", summary: "Attach a document, such as a supplier's recall notice, as text", tag: "Evidence",
     auth: { permission: "incident.write" }, params: Incident, body: NewDocument,
-    handler: async ({ body, params, org, user }) => addDocument({ ...c.deps, ai: c.ai }, { ...body, orgId: org.orgId, incidentId: params.incidentId, userId: user.id }),
+    handler: async ({ body, params, org, user }) => addDocument({ ...c.deps, ai: aiFor(org) }, { ...body, orgId: org.orgId, incidentId: params.incidentId, userId: user.id }),
   });
   route({
     method: "POST", path: "/api/orgs/:orgId/incidents/:incidentId/documents/:documentId/extract", summary: "Read products, batches, dates and remedy out of a document. Every field quotes the document. Nothing is applied.", tag: "Evidence",
     auth: { permission: "incident.write" }, params: Incident.extend({ documentId: uuid }),
     body: z.object({ method: z.enum(["auto", "pattern_rules", "ai"]).default("auto") }),
     handler: async ({ body, params, org, user }) =>
-      extractDocument({ ...c.deps, ai: c.ai }, { orgId: org.orgId, incidentId: params.incidentId, documentId: params.documentId, userId: user.id, method: body.method }),
+      extractDocument({ ...c.deps, ai: aiFor(org) }, { orgId: org.orgId, incidentId: params.incidentId, documentId: params.documentId, userId: user.id, method: body.method }),
   });
   route({
     method: "POST", path: "/api/orgs/:orgId/incidents/:incidentId/extractions/:extractionId/accept", summary: "A person saves rules after checking what was read from a document", tag: "Evidence",
     auth: { permission: "incident.write" }, params: Incident.extend({ extractionId: uuid }), body: AcceptExtraction,
     handler: async ({ body, params, org, user }) =>
-      acceptExtraction({ ...c.deps, ai: c.ai }, { ...body, orgId: org.orgId, incidentId: params.incidentId, extractionId: params.extractionId, userId: user.id }),
+      acceptExtraction({ ...c.deps, ai: aiFor(org) }, { ...body, orgId: org.orgId, incidentId: params.incidentId, extractionId: params.extractionId, userId: user.id }),
   });
   route({
     method: "POST", path: "/api/orgs/:orgId/incidents/:incidentId/aliases/suggest", summary: "Find order lines whose product code looks like one in scope but is not matched. Suggestions change nothing.", tag: "Evidence",
     auth: { permission: "incident.write" }, params: Incident, body: z.object({ withAi: z.boolean().default(true) }),
-    handler: async ({ body, params, org }) => suggestAliases({ ...c.deps, ai: c.ai }, { orgId: org.orgId, incidentId: params.incidentId, withAi: body.withAi }),
+    handler: async ({ body, params, org }) => suggestAliases({ ...c.deps, ai: aiFor(org) }, { orgId: org.orgId, incidentId: params.incidentId, withAi: body.withAi }),
   });
   route({
     method: "POST", path: "/api/orgs/:orgId/aliases/:aliasId/decision", summary: "A person confirms or rejects a product-code alias", tag: "Evidence",
     auth: { permission: "incident.write" }, params: OrgParams.extend({ aliasId: uuid }), body: z.object({ decision: z.enum(["confirm", "reject"]) }),
-    handler: async ({ body, params, org, user }) => decideAlias({ ...c.deps, ai: c.ai }, { orgId: org.orgId, aliasId: params.aliasId, userId: user.id, decision: body.decision }),
+    handler: async ({ body, params, org, user }) => decideAlias({ ...c.deps, ai: aiFor(org) }, { orgId: org.orgId, aliasId: params.aliasId, userId: user.id, decision: body.decision }),
   });
   route({
     method: "POST", path: "/api/orgs/:orgId/incidents/:incidentId/status", summary: "Close or cancel an incident", tag: "Incidents",
@@ -686,6 +690,34 @@ export function buildApp(c: Container): Router {
   route({
     method: "GET", path: "/api/orgs/:orgId/analytics", summary: "Results by incident, payment outcomes, timings and failure reasons", tag: "Monitoring", auth: { permission: "org.read" }, params: OrgParams,
     handler: async ({ org }) => reports.analytics(c.db, org.orgId),
+  });
+
+  route({
+    method: "GET", path: "/api/orgs/:orgId/errors", summary: "Recent server errors and failed background jobs in this workspace", tag: "Monitoring",
+    auth: { permission: "org.manage" }, params: OrgParams, query: Paging,
+    handler: async ({ query, org }) => {
+      const page = reports.pageOf(query.page, query.size);
+      const [total] = await c.db.query<{ n: number }>("select count(*)::int as n from error_events where org_id = $1", [org.orgId]);
+      const rows = await c.db.query(
+        `select id, source, where_ as "where", message, detail, created_at from error_events where org_id = $1
+          order by id desc limit ${page.limit} offset ${page.offset}`,
+        [org.orgId],
+      );
+      return { total: total?.n ?? 0, rows };
+    },
+  });
+  route({
+    method: "GET", path: "/api/orgs/:orgId/export", summary: "Download every record of this workspace as JSON (credentials and tokens left out)", tag: "Organisation",
+    auth: { permission: "org.manage" }, params: OrgParams, rateLimit: { max: 10, windowMs: 60 * 60_000 },
+    handler: async ({ org, user, reply }) => {
+      const data = await exportWorkspace(c.db, org.orgId, c.clock.now());
+      await audit(c.db, {
+        orgId: org.orgId, actor: { kind: "user", userId: user.id }, action: "organisation.exported", entityType: "organisation", entityId: org.orgId,
+        data: { counts: data.counts }, at: c.clock.now(),
+      });
+      reply.header("Content-Disposition", `attachment; filename="make-good-${org.slug}-${c.clock.now().toISOString().slice(0, 10)}.json"`);
+      return data;
+    },
   });
 
   // ---------- currencies ----------

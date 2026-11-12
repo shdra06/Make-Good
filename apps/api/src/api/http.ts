@@ -9,6 +9,7 @@ import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest }
 import { z, ZodError } from "zod";
 import type { Config } from "../platform/config.ts";
 import type { Queryable } from "../platform/db/db.ts";
+import type { ErrorLog } from "../platform/error-log.ts";
 import { AppError, ForbiddenError, RateLimitedError, UnauthenticatedError } from "../platform/errors.ts";
 import {
   requireMembership,
@@ -96,7 +97,7 @@ export type Router = {
   openapi(): Record<string, unknown>;
 };
 
-export function createRouter(input: { config: Config; identity: IdentityDeps; now: () => Date }): Router {
+export function createRouter(input: { config: Config; identity: IdentityDeps; now: () => Date; errorLog?: ErrorLog }): Router {
   const { config, identity } = input;
   const app = Fastify({
     logger: config.logLevel === "silent" ? false : { level: config.logLevel },
@@ -160,6 +161,12 @@ export function createRouter(input: { config: Config; identity: IdentityDeps; no
       return reply.code(status).send({ error: { code: "BAD_REQUEST", message: (err as Error).message } });
     }
     req.log.error({ err }, "unhandled error");
+    void input.errorLog?.({
+      source: "request",
+      where: `${req.method} ${req.routeOptions?.url ?? req.url.split("?")[0]}`,
+      orgId: (req.params as Record<string, string> | undefined)?.orgId ?? null,
+      error: err,
+    });
     return reply.code(500).send({ error: { code: "INTERNAL", message: "Something went wrong on our side." } });
   });
 

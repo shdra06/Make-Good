@@ -1,7 +1,7 @@
 "use client";
 
 import { ROLE_LABELS } from "@makegood/shared";
-import { AlertTriangle, LayoutDashboard, Loader2, LogOut, Menu, Plug, Settings, Users, X } from "lucide-react";
+import { Activity, AlertTriangle, BarChart3, LayoutDashboard, Loader2, LogOut, Menu, Plug, Settings, Users, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
@@ -15,6 +15,8 @@ import { cn } from "@/lib/utils";
 const NAV = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/incidents", label: "Incidents", icon: AlertTriangle },
+  { href: "/monitoring", label: "Monitoring", icon: Activity },
+  { href: "/analytics", label: "Analytics", icon: BarChart3 },
   { href: "/connections", label: "Connections", icon: Plug },
   { href: "/team", label: "Team", icon: Users },
   { href: "/settings", label: "Settings", icon: Settings },

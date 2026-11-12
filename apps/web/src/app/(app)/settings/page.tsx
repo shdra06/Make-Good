@@ -2,7 +2,8 @@
 
 import type { Membership } from "@makegood/shared";
 import { useQuery } from "@tanstack/react-query";
-import { Loader2 } from "lucide-react";
+import { Download, Loader2 } from "lucide-react";
+import Link from "next/link";
 import { useState, type FormEvent } from "react";
 import { Field } from "@/components/field";
 import { Panel, Row } from "@/components/incident/bits";
@@ -13,9 +14,10 @@ import { Alert, Label } from "@/components/ui/primitives";
 import { api } from "@/lib/api";
 import { money } from "@/lib/format";
 import { allowed, useOrgAction } from "@/lib/org-action";
-import { orgPath, useOrg } from "@/lib/session";
+import { orgPath, useMe, useOrg } from "@/lib/session";
 
 type Settings = {
+  aiEnabled: boolean;
   approval: { dualControl: boolean; approvalsRequired: number; largeBatchMinor: number | null; largeBatchApprovalsRequired: number };
   fxAssumedSpreadBps: number | null;
   demoData: boolean;
@@ -104,8 +106,63 @@ function ApprovalForm({ org, settings, canManage }: { org: Membership; settings:
   );
 }
 
+function AiPanel({ org, settings, canManage, aiConfigured }: { org: Membership; settings: Settings; canManage: boolean; aiConfigured: boolean }) {
+  const { run, pending } = useOrgAction([["org", org.orgId], ["me"]]);
+  return (
+    <Panel
+      title="AI"
+      hint={
+        <>
+          Gemini can read supplier notices, product titles and masked evidence to suggest rules. It never sees customer names or emails, and it decides nothing.{" "}
+          <Link href="/ai" className="underline">
+            What it is sent
+          </Link>
+        </>
+      }
+      testId="ai-panel"
+    >
+      <label className="flex items-start gap-3">
+        <input
+          type="checkbox"
+          className="mt-1 size-4"
+          checked={settings.aiEnabled}
+          disabled={!canManage || pending}
+          onChange={(e) =>
+            void run(
+              () => api.patch(orgPath(org, "/settings"), { aiEnabled: e.target.checked }),
+              e.target.checked ? "AI is on for this workspace." : "AI is off. Notices are read by pattern rules.",
+            )
+          }
+        />
+        <span>
+          <span className="block text-sm font-medium">Use AI in this workspace</span>
+          <span className="block text-sm text-muted-foreground">
+            {aiConfigured ? "Off means notices are read by fixed pattern rules only." : "This server has no AI key, so AI is off whatever this says."}
+          </span>
+        </span>
+      </label>
+    </Panel>
+  );
+}
+
+function ExportPanel({ org }: { org: Membership }) {
+  return (
+    <Panel
+      title="Your data"
+      hint="Download every record of this workspace as one JSON file: orders, payments, decisions, approvals and the audit trail. Credentials and sign-in tokens are left out. Keep it somewhere safe; it contains customer data."
+    >
+      <Button asChild variant="outline" className="w-fit">
+        <a href={`/api/orgs/${org.orgId}/export`} download>
+          <Download /> Download a backup
+        </a>
+      </Button>
+    </Panel>
+  );
+}
+
 export default function SettingsPage() {
   const org = useOrg();
+  const me = useMe();
   const detail = useQuery({
     queryKey: ["org", org?.orgId],
     queryFn: () => api.get<Membership & { settings: Settings }>(orgPath(org!)),
@@ -137,6 +194,8 @@ export default function SettingsPage() {
             <ApprovalForm key={JSON.stringify(detail.data.settings)} org={org} settings={detail.data.settings} canManage={canManage} />
           )}
         </Panel>
+        {detail.data ? <AiPanel org={org} settings={detail.data.settings} canManage={canManage} aiConfigured={Boolean(me.data?.server.aiConfigured)} /> : null}
+        {canManage ? <ExportPanel org={org} /> : null}
       </div>
     </>
   );

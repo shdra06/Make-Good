@@ -46,6 +46,8 @@ const Env = z.object({
   EMAIL_FROM: z.string().default("Make Good <notices@example.com>"),
   /** Public reference exchange rates (European Central Bank, via Frankfurter). Indicative only. */
   FX_API_URL: z.string().url().default("https://api.frankfurter.dev/v1"),
+  /** Optional: server errors are also posted here as JSON (a Slack or Discord webhook works). */
+  ERROR_WEBHOOK_URL: z.string().url().optional(),
   LOG_LEVEL: z.enum(["debug", "info", "warn", "error", "silent"]).default("info"),
 });
 
@@ -66,6 +68,7 @@ export type Config = {
   gemini: { apiKey: string; model: string } | null;
   email: { transport: "file" | "resend"; resendApiKey: string | null; from: string };
   fxApiUrl: string;
+  errorWebhookUrl: string | null;
   logLevel: "debug" | "info" | "warn" | "error" | "silent";
 };
 
@@ -133,6 +136,7 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env, options: { r
     gemini: env.GEMINI_API_KEY ? { apiKey: env.GEMINI_API_KEY, model: env.GEMINI_MODEL } : null,
     email: { transport: env.EMAIL_TRANSPORT, resendApiKey: env.RESEND_API_KEY ?? null, from: env.EMAIL_FROM },
     fxApiUrl: env.FX_API_URL.replace(/\/$/, ""),
+    errorWebhookUrl: env.ERROR_WEBHOOK_URL ?? null,
     logLevel: env.LOG_LEVEL,
   };
 }

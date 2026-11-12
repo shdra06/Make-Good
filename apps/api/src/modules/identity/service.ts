@@ -113,6 +113,8 @@ export async function signOut(deps: Deps, token: string | undefined): Promise<vo
 
 export const OrgSettings = z.object({
   approval: ApprovalPolicy.default(ApprovalPolicy.parse({})),
+  /** Whether this workspace lets the AI (Gemini) read its notices, product titles and masked evidence. Off: pattern rules only. */
+  aiEnabled: z.boolean().default(true),
   /** An assumed currency-conversion cost, in basis points, for forecasts only. Null hides the estimate. */
   fxAssumedSpreadBps: z.number().int().min(0).max(2000).nullable().default(null),
   /** Set when sample data was loaded, so every screen can say so. */
