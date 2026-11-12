@@ -7,7 +7,9 @@ const children = [
   ["api", ["run", "dev", "-w", "@makegood/api"]],
   ["web", ["run", "dev", "-w", "@makegood/web"]],
 ].map(([name, args]) => {
-  const child = spawn(["npm", ...args].join(" "), { stdio: ["ignore", "pipe", "pipe"], shell: true });
+  // Links the API puts in customer emails point at the web app.
+  const env = { ...process.env, PUBLIC_URL: process.env.PUBLIC_URL ?? "http://localhost:3000" };
+  const child = spawn(["npm", ...args].join(" "), { stdio: ["ignore", "pipe", "pipe"], shell: true, env });
   const prefix = (line) => `[${name}] ${line}`;
   for (const stream of [child.stdout, child.stderr]) {
     stream.setEncoding("utf8");

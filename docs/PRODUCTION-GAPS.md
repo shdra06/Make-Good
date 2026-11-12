@@ -2,6 +2,8 @@
 
 Written 11 Nov 2026 on branch `production-grade`. No deadline is assumed. Every shortcut is listed, whatever the reason for it.
 
+**Progress (12 Nov 2026):** 1.1 to 1.6, 1.10, 1.11 and 9.1 are fixed on `production-grade` (Next.js app, TypeScript, components, routes, design tokens, real sign-up, Playwright in CI, workspaces). 1.7 is partly fixed: dashboard, incidents and the recall workflow exist; connections, team and settings do not yet. 4.2 partly: basic security headers are set by the web app; no Content-Security-Policy yet.
+
 Each item says **why** it is the way it is:
 
 - **Shortcut**: done the quick way, mostly because of the submission date. This is a choice we can now undo.

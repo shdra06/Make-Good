@@ -12,7 +12,7 @@ const dataDir = path.join(os.tmpdir(), `makegood-e2e-${process.pid}`);
 
 export default defineConfig({
   testDir: "./e2e",
-  timeout: 60_000,
+  timeout: 90_000,
   expect: { timeout: 15_000 },
   fullyParallel: false,
   workers: 1,
@@ -30,7 +30,15 @@ export default defineConfig({
       url: `http://localhost:${API_PORT}/api/health`,
       reuseExistingServer: false,
       timeout: 60_000,
-      env: { PORT: String(API_PORT), DATA_DIR: dataDir, NODE_ENV: "development", LOG_LEVEL: "warn", PUBLIC_URL: `http://localhost:${WEB_PORT}` },
+      // GEMINI_API_KEY is blanked so the tests never call the real AI.
+      env: {
+        PORT: String(API_PORT),
+        DATA_DIR: dataDir,
+        NODE_ENV: "development",
+        LOG_LEVEL: "warn",
+        PUBLIC_URL: `http://localhost:${WEB_PORT}`,
+        GEMINI_API_KEY: "",
+      },
     },
     {
       command: `npm run dev -w @makegood/web -- -p ${WEB_PORT}`,

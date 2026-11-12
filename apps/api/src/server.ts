@@ -1,10 +1,7 @@
-// The API process. In development it also runs the job worker, so one command
-// starts everything. In production run `node src/worker.ts` separately and set
+// The API process (JSON only; the web app is apps/web). In development it also
+// runs the job worker, so one command starts everything. In production run `node src/worker.ts` separately and set
 // WORKER_INLINE=0 here.
 
-import fs from "node:fs";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { buildApp } from "./api/routes.ts";
 import { createContainer } from "./container.ts";
 import { loadConfig } from "./platform/config.ts";
@@ -13,17 +10,6 @@ import { enqueue } from "./platform/jobs/queue.ts";
 const config = loadConfig();
 const container = await createContainer(config);
 const { app } = buildApp(container);
-
-// Serve the old one-page app (legacy-web) from the API until the Next.js app in apps/web replaces it.
-const webDist = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../legacy-web/public");
-if (fs.existsSync(path.join(webDist, "index.html"))) {
-  const { default: fastifyStatic } = await import("@fastify/static");
-  await app.register(fastifyStatic, { root: webDist, wildcard: false });
-  app.setNotFoundHandler((req, reply) => {
-    if (req.method === "GET" && !req.url.startsWith("/api/")) return reply.sendFile("index.html");
-    return reply.code(404).send({ error: { code: "NOT_FOUND", message: "Not found." } });
-  });
-}
 
 let sweepTimer: NodeJS.Timeout | null = null;
 if (config.workerInline) {

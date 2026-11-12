@@ -29,7 +29,7 @@ The narration is in `demo/video-src/narration.json`. The AI steps are off in thi
 ## How it is made
 
 1. `python demo/video-src/make_voice.py` makes one voice clip per line with Microsoft's neural voice "Andrew" (edge-tts; only the narration text is sent) and measures each.
-2. `node scripts/demo-video.ts` (in `apps/api`) starts the app in its own process (in-memory database, PayPal simulator), plays the animated scenes (`demo/video-src/scenes.html`), then drives the real page in Edge. Each step lasts at least as long as its voice clip. Frames come straight from the browser at up to 30 a second.
+2. (Removed on branch `production-grade`; still on `main`.) `node scripts/demo-video.ts` (in `apps/api`) starts the app in its own process (in-memory database, PayPal simulator), plays the animated scenes (`demo/video-src/scenes.html`), then drives the real page in Edge. Each step lasts at least as long as its voice clip. Frames come straight from the browser at up to 30 a second.
 3. The same script joins the frames and voice clips with ffmpeg. The long wait for PayPal is sped up eight times, and the caption says so.
 
 ```bash

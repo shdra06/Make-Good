@@ -72,7 +72,7 @@ test("a held customer is emailed a one-time link; their answer is evidence only"
   assert.ok(notice!.body.includes(sent.url), "the email carries the link");
   assert.doesNotMatch(notice!.body, /\$|USD|59/, "the email names no amount");
 
-  const token = new URL(sent.url).searchParams.get("confirm")!;
+  const token = sent.url.split("/confirm/")[1]!;
   await answerConfirm(s.deps, { token, batchCode: "LOT-24B" });
   const [after] = await s.db.query<{ status: string }>("select status from candidates where id = $1", [candidate!.id]);
   assert.equal(after!.status, "proposed", "still waiting for a member of staff");

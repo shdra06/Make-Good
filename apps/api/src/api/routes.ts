@@ -392,7 +392,7 @@ export function buildApp(c: Container): Router {
     auth: { permission: "candidate.decide" }, params: OrgParams.extend({ candidateId: uuid }),
     handler: async ({ params, org, user }) => {
       const { token } = await createConfirmLink(c.deps, { orgId: org.orgId, candidateId: params.candidateId, userId: user.id });
-      return { url: `${c.config.publicUrl}/?confirm=${token}` };
+      return { url: `${c.config.publicUrl}/confirm/${token}` };
     },
   });
   const mailer = () => {

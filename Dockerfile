@@ -17,7 +17,6 @@ RUN npm ci --omit=dev -w @makegood/api
 WORKDIR /app/apps/api
 COPY apps/api/src ./src
 COPY apps/api/db ./db
-COPY apps/api/legacy-web /app/apps/api/legacy-web
 ENV NODE_ENV=production PORT=4000 DATA_DIR=/data
 RUN mkdir -p /data && chown node:node /data
 VOLUME /data

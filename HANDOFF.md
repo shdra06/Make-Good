@@ -11,10 +11,9 @@ A PayPal hackathon project. When a supplier recalls one batch of a product, Make
 | Path | What |
 |---|---|
 | `apps/api/` | The platform backend. Fastify, TypeScript run directly by Node 24 (no build), PostgreSQL via PGlite locally. Port 4000. |
-| `apps/web/` | **The new web app** (branch `production-grade`): Next.js 16, React 19, TypeScript, Tailwind 4, shadcn-style components in `src/components/ui`, TanStack Query. `/api/*` is forwarded to the API (`next.config.ts`). Port 3000. |
+| `apps/web/` | **The web app** (branch `production-grade`). Incident steps are tabs under `src/app/(app)/incidents/[id]/` (notice, customers, evidence, options, approval, payments, activity); shared data in `src/lib/incident-context.tsx`; the customer page is `src/app/confirm/[token]`. Stack: Next.js 16, React 19, TypeScript, Tailwind 4, shadcn-style components in `src/components/ui`, TanStack Query. `/api/*` is forwarded to the API (`next.config.ts`). Port 3000. |
 | `packages/shared/` | Types shared by API and web (`Me`, roles, `formatMoney`). TypeScript source, no build. |
-| `apps/api/legacy-web/public/` | The old one-page app (plain JS). Still served by the API on port 4000 until the Next.js app covers every step; then delete it. |
-| `e2e/`, `playwright.config.ts` | Browser tests for the new app. Start their own API (4100) and web (3100). Edge locally, Chromium in CI. |
+| `e2e/`, `playwright.config.ts` | Browser tests: `foundation.spec.ts` (sign-up, sign-in, guard, demo) and `recall.spec.ts` (the whole recall case, 1 minute). Start their own API (4100, AI off) and web (3100). Edge locally, Chromium in CI. |
 | `scripts/dev.mjs`, `scripts/start.mjs` | Run API and web together (dev; production with the API private on 4001). |
 | `apps/api/db/migrations/` | `0001` to `0004`. Applied files are never edited; add `0005_…`. |
 | `render.yaml` | Render Blueprint: one web service (`npm start`: Next.js public, API private) and free Postgres. Simulator on. Asks for `GEMINI_API_KEY`. Not yet deployed. |
@@ -45,7 +44,7 @@ Repository root (npm workspaces; one `package-lock.json` at the root, `npm insta
 |---|---|
 | `npm run dev` | API (4000) and web app (3000) together. Open http://localhost:3000. |
 | `npm run typecheck` / `npm run lint` / `npm run format` | All workspaces. CI runs the same. |
-| `npx playwright test` | Browser tests for the new web app (6 tests, about 30 s, Edge). |
+| `npx playwright test` | Browser tests for the web app (7 tests, about 1.5 minutes, Edge). Must pass before every commit that touches the page. |
 | `npm run build` then `npm start` | Production build and start, as on Render. |
 
 In `apps/api`:
@@ -57,9 +56,6 @@ In `apps/api`:
 | `npm start` | Server and page at http://localhost:4000. "Open the recall case" loads the demo. |
 | `npm run sandbox:recall` | The recall case on the real PayPal sandbox. About 8 minutes: run it in the background. |
 | `npm run ai:verify` | The three AI steps against the real model in `.env`. About 1 minute. |
-| `npm run test:e2e` | The page in Edge, start to finish, on the simulator. About 1 minute. |
-| `npm run demo:video` | The submission video with voice-over (`demo/VIDEO-PLAN.md`). Make the voice first. About 5 minutes. |
-| `npm run demo:capture` | Same walk-through, slow, with captions: writes the demo video and screenshots. About 5 minutes. |
 
 ## Rules that must hold
 
@@ -102,10 +98,10 @@ Blocked on the owner:
 - [x] AI key: Gemini key in `apps/api/.env`, verified. Rotate it: it was pasted in a chat
 - [ ] Switch on Transaction Search for the PayPal app, then verify sync
 - [ ] Interview 3 to 5 shop owners (`docs/STRATEGY.md` section 5)
-- [ ] Trim or voice the demo video (`docs/DEMO.md`); re-run `npm run demo:capture` first, the page changed
+- [ ] New demo video of the new web app. The old video tools (`demo-capture.ts`, `demo-video.ts`) drove the old page and were removed on `production-grade`; they are still on `main`. Port them to the new pages first
 
 Known loose end: another session's `integration/proposed-0002_…sql` (outside this repo) must become `0003` if it is ever applied.
 
 ## Last session
 
-12 Nov 2026 (branch `production-grade`): step 1 of the rebuild done. Old prototype deleted. npm workspaces (`apps/api`, `apps/web`, `packages/shared`). New Next.js app: landing page with the demo button, sign-up, sign-in, sign-out, sign-in guard (`src/proxy.ts`), app shell with sidebar, dashboard, incidents list, incident page (placeholder for the workflow). Security headers. Old page moved to `apps/api/legacy-web`. CI now runs format, types, lint, API tests, web build and Playwright. `render.yaml` and the Dockerfile updated for workspaces; production mode checked locally (Render itself not yet). Checks: 120 API tests, 6 new browser tests, old browser test, all passing. Next: step 2, move the seven recall steps into the incident page as tabs until a Playwright test covers what `npm run test:e2e` covers; then delete `legacy-web`.
+12 Nov 2026 (branch `production-grade`), step 2 of the rebuild done: the whole recall workflow is in the Next.js app as tabs on the incident page (notice and rules, customers with CSV upload, two-answer table and product-code decisions, evidence with the record panel, options, approval, payments with simulator faults and customer emails, activity). Customer link is now `/confirm/<token>`. The old one-page app, its static serving in the API, and its video scripts are deleted. Checks: 120 API tests, 7 Playwright tests (including the full recall flow with a lost PayPal reply), types, lint, format, build. Next: step 3, the missing screens (connections, team and roles, settings, open an incident), then step 4, security. The demo video must be remade for the new pages.

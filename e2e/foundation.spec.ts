@@ -58,7 +58,7 @@ test("sign-up refuses a short password before sending anything", async ({ page }
 test("the demo opens the recall case inside the app", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "Open the recall demo" }).click();
-  await expect(page).toHaveURL(/\/incidents\/[0-9a-f-]{36}$/, { timeout: 60_000 });
+  await expect(page).toHaveURL(/\/incidents\/[0-9a-f-]{36}\/notice$/, { timeout: 60_000 });
   await expect(page.getByRole("heading", { level: 1 })).toContainText("HM-300");
   await page.getByRole("link", { name: "Dashboard" }).click();
   await expect(page.getByRole("cell", { name: /HM-300/ })).toBeVisible();

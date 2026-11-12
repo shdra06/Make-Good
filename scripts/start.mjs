@@ -23,7 +23,11 @@ const run = (name, command, args, env, shell = false) => {
 };
 
 const children = [
-  run("api", process.execPath, ["apps/api/src/server.ts"], { PORT: apiPort }),
+  // Links in customer emails point at the public web address (Render sets RENDER_EXTERNAL_URL).
+  run("api", process.execPath, ["apps/api/src/server.ts"], {
+    PORT: apiPort,
+    PUBLIC_URL: process.env.PUBLIC_URL ?? process.env.RENDER_EXTERNAL_URL ?? `http://localhost:${webPort}`,
+  }),
   run("web", "npm", ["run", "start", "-w", "@makegood/web", "--", "-p", webPort], { API_URL: `http://127.0.0.1:${apiPort}` }, process.platform === "win32"),
 ];
 

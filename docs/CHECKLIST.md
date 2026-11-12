@@ -190,7 +190,7 @@ An independent product review (10 Nov 2026) and the brief that followed it asked
 | The other merchant screens (dashboard, monitoring, currencies, settings, staff) | **Not built.** The API for them exists and is tested |
 | Customer claim pages | **Not built** |
 
-The page is `apps/web/public` (plain HTML, CSS and JavaScript, no build step), served by the API at http://localhost:4000. It has an automated browser test in Microsoft Edge (`npm run test:e2e`, 15 checks, passing on 11 Nov 2026, including CSV upload and customer emails). Customer emails are saved as files in `apps/api/.data/outbox` (`test/notices.test.ts`); nothing is sent over the internet. It is not in CI, because CI has no Edge. The old prototype's console in `make-good/public` still runs against the old prototype only.
+On branch `production-grade` the web app is `apps/web`: Next.js 16, React 19, TypeScript. Seven Playwright browser tests pass (12 Nov 2026), including the whole recall case from notice to PayPal-confirmed refunds with a lost reply, customer emails and the one-time customer link; CI runs them in Chromium. Customer emails are saved as files in `apps/api/.data/outbox` (`test/notices.test.ts`); nothing is sent over the internet. On `main` the page is still the old plain-JavaScript one.
 
 ## Stage 9. Hardening
 

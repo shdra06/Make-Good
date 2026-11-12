@@ -68,7 +68,7 @@ export async function emailConfirmLink(
   if (!who) throw new NotFoundError("Record");
   if (!who.customer_email) throw new ConflictError("NO_EMAIL", "This customer has no email address on record. Copy the link and send it another way.");
   const { token } = await createConfirmLink(deps, input);
-  const url = `${input.publicUrl}/?confirm=${token}`;
+  const url = `${input.publicUrl}/confirm/${token}`;
   const product = who.product ?? "your product";
   const text = [
     greet(who.customer_name),
