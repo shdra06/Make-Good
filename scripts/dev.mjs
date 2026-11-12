@@ -2,6 +2,10 @@
 // Open http://localhost:3000. Ctrl+C stops both.
 
 import { spawn } from "node:child_process";
+import { fileURLToPath } from "node:url";
+
+// Run from the repository root wherever this is started from.
+const root = fileURLToPath(new URL("..", import.meta.url));
 
 const children = [
   ["api", ["run", "dev", "-w", "@makegood/api"]],
@@ -9,7 +13,9 @@ const children = [
 ].map(([name, args]) => {
   // Links the API puts in customer emails point at the web app.
   const env = { ...process.env, PUBLIC_URL: process.env.PUBLIC_URL ?? "http://localhost:3000" };
-  const child = spawn(["npm", ...args].join(" "), { stdio: ["ignore", "pipe", "pipe"], shell: true, env });
+  // A PORT set for the whole command is the web app's; the API always uses 4000 here.
+  env.PORT = name === "api" ? "4000" : (process.env.PORT ?? "3000");
+  const child = spawn(["npm", ...args].join(" "), { stdio: ["ignore", "pipe", "pipe"], shell: true, env, cwd: root });
   const prefix = (line) => `[${name}] ${line}`;
   for (const stream of [child.stdout, child.stderr]) {
     stream.setEncoding("utf8");
