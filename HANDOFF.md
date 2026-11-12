@@ -100,11 +100,25 @@ Blocked on the owner:
 - [ ] Interview 3 to 5 shop owners (`docs/STRATEGY.md` section 5)
 - [x] New demo video of the new web app: `demo/video/make-good-submission.mp4` (2 min 52 s, voice-over, AI off). Remake: `demo/VIDEO-PLAN.md` (`node demo/video-src/record.ts`)
 
+Sponsor features (branch `sponsor-features`, worktree `../make-good-sponsors`, not merged):
+
+- [x] Bryntum recall timeline: Timeline step, `GET …/timeline` (`recovery/timeline.ts`). Bryntum Scheduler **Community 8.0.1 (MIT)** only, read only; no paid-tier features. Batch windows, mixed stock, ship dates, PayPal 180-day refund windows. Tests: `test/timeline.test.ts`, the recall browser test
+- [x] Channel3 replacement value: panel on the Options step, `…/catalog`, `…/catalog/search`, `…/catalog/confirm` (`modules/catalog/`), migration 0011 (rows never change). A person confirms the product; the median new in-stock price can price a "fixed per unit" option (dry run). Tested with a fake Channel3 only. **Needs `CHANNEL3_API_KEY`** to verify the real API
+- [ ] Before merging: if `production-grade` has gained its own `0011_…` migration, renumber this one
+- [ ] Channel3 Recall Radar (offer.deleted webhooks, Svix-signed, US/USD only): not built; needs the key and a public webhook URL
+
 Known loose end: another session's `integration/proposed-0002_…sql` (outside this repo) must become `0003` if it is ever applied.
 
 ## Last session
 
-12 Nov 2026 (branch `production-grade`, also on `main` and live on Render at https://make-good.onrender.com):
+12 Nov 2026, sponsor session (branch `sponsor-features`, in the worktree `../make-good-sponsors`; the main checkout was in use by another session):
+- Research checked against vendor pages: Bryntum 8 has a free MIT tier (packages end in `-community`; `@bryntum/scheduler` is an empty placeholder); time-range shading and AI are paid. Channel3 webhooks are signed (Standard Webhooks); subscriptions US/USD only.
+- Channel3 coverage, checked through its public MCP server (no key, search words only): 8 of 10 small brands and 6 of 6 big brands found in the top 3; bare model codes 0 of 4. So searches must use the product name, not a code.
+- Built: the Bryntum timeline and the Channel3 replacement-value panel (see the work queue). Bryntum fetched Font Awesome from a CDN, blocked by our CSP; the icons now come from `@bryntum/core-community`.
+- Checks: see the commit messages on `sponsor-features`. Not verified: the real Channel3 REST API (no key).
+- Local only: `.claude/dev-sponsors.mjs` runs this worktree on ports 4100/3200 (the e2e tests also use 4100: stop it first).
+
+Earlier, 12 Nov 2026 (branch `production-grade`, also on `main` and live on Render at https://make-good.onrender.com):
 - Fixed on the live site: row-level security rules failed on pooled Postgres connections (`invalid input syntax for type uuid: ""`), which broke about one request in three and the job worker. Migration 0008.
 - Privacy, terms and "how AI is used" pages (`apps/web/src/app/(legal)`), linked from the footer and sign-up. They are drafts that need a lawyer. Settings has a per-workspace AI switch (`aiEnabled`).
 - Error tracking: `platform/error-log.ts` writes server errors and failed jobs to `error_events`, shown on Monitoring; optional `ERROR_WEBHOOK_URL`.

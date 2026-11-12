@@ -82,7 +82,7 @@ test("the recall time line on the synthetic case, read only", async () => {
   ]);
   assert.deepEqual(t.mixedStock, [{ sku: "CM-412", warehouse: "default", from: daysAgo(27), to: daysAgo(22), affectedBatch: "K-0719", otherBatch: "K-0726" }]);
 
-  const [{ n: candidates }] = await db.query<{ n: number }>("select count(*)::int as n from candidates where incident_id = $1", [seeded.incidentId]);
+  const candidates = (await db.query<{ n: number }>("select count(*)::int as n from candidates where incident_id = $1", [seeded.incidentId]))[0]!.n;
   assert.equal(t.records.length, candidates, "every record of the incident is on the line");
   for (const r of t.records) {
     if (r.shippedAt && r.eligibility === "uncertain") {

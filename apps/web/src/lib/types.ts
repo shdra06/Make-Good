@@ -302,3 +302,37 @@ export type RecallTimeline = {
     owedClosingSoon: number;
   } | null;
 };
+
+export type ReplacementValue = {
+  currency: string;
+  basis: "new_in_stock" | "new_any";
+  offers: number;
+  retailers: number;
+  medianMinor: number;
+  minMinor: number;
+  maxMinor: number;
+};
+export type CatalogSearchResult = {
+  source: "channel3";
+  query: string;
+  retrievedAt: string;
+  products: Array<{ id: string; title: string; brand: string | null; imageUrl: string | null; replacementValue: ReplacementValue | null }>;
+};
+export type CatalogReference = {
+  id: string;
+  source: string;
+  query: string;
+  product_id: string;
+  title: string;
+  brand: string | null;
+  basis: "new_in_stock" | "new_any" | null;
+  currency: string | null;
+  offer_count: number;
+  retailer_count: number;
+  median_minor: number | null;
+  min_minor: number | null;
+  max_minor: number | null;
+  retrieved_at: string;
+  confirmed_by_name: string | null;
+};
+export type CatalogList = { configured: boolean; source: string; meaning: string; references: CatalogReference[] };

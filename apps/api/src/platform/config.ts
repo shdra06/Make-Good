@@ -40,6 +40,9 @@ const Env = z.object({
   /** Google Gemini, used for evidence work. Without a key, pattern rules read notices and the other AI steps say they are off. */
   GEMINI_API_KEY: z.string().optional(),
   GEMINI_MODEL: z.string().default("gemini-flash-latest"),
+  /** Channel3 product catalogue: what a recalled product is and what a new one costs. Without a key the catalogue panel says it is off. */
+  CHANNEL3_API_KEY: z.string().optional(),
+  CHANNEL3_API_URL: z.string().url().default("https://api.trychannel3.com"),
   /** "file" writes emails to DATA_DIR/outbox for local work. "resend" sends them. */
   EMAIL_TRANSPORT: z.enum(["file", "resend"]).default("file"),
   RESEND_API_KEY: z.string().optional(),
@@ -68,6 +71,7 @@ export type Config = {
   allowLivePayPal: boolean;
   paypalPartner: { clientId: string; clientSecret: string } | null;
   gemini: { apiKey: string; model: string } | null;
+  channel3: { apiKey: string; baseUrl: string } | null;
   email: { transport: "file" | "resend"; resendApiKey: string | null; from: string };
   fxApiUrl: string;
   errorWebhookUrl: string | null;
@@ -137,6 +141,7 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env, options: { r
     allowLivePayPal: env.ALLOW_LIVE_PAYPAL === LIVE_PAYPAL_PHRASE,
     paypalPartner: partner,
     gemini: env.GEMINI_API_KEY ? { apiKey: env.GEMINI_API_KEY, model: env.GEMINI_MODEL } : null,
+    channel3: env.CHANNEL3_API_KEY ? { apiKey: env.CHANNEL3_API_KEY, baseUrl: env.CHANNEL3_API_URL } : null,
     email: { transport: env.EMAIL_TRANSPORT, resendApiKey: env.RESEND_API_KEY ?? null, from: env.EMAIL_FROM },
     fxApiUrl: env.FX_API_URL.replace(/\/$/, ""),
     errorWebhookUrl: env.ERROR_WEBHOOK_URL ?? null,

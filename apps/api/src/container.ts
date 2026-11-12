@@ -11,6 +11,7 @@ import { JobRunner, type Job, type JobHandler } from "./platform/jobs/queue.ts";
 import { runDetectors } from "./modules/detection/service.ts";
 import type { EvidenceAi } from "./modules/evidence/ai.ts";
 import { GeminiEvidenceAi } from "./modules/evidence/gemini.ts";
+import { Channel3Catalog, type ProductCatalog } from "./modules/catalog/channel3.ts";
 import { OperationExecutor } from "./modules/execution/executor.ts";
 import { FxService } from "./modules/fx/service.ts";
 import type { Deps as IdentityDeps } from "./modules/identity/service.ts";
@@ -30,6 +31,8 @@ export type Container = {
   deps: { db: Db; clock: Clock };
   /** Gemini, for reading evidence. Null when no API key is set: every AI step then says so and the rest works. */
   ai: EvidenceAi | null;
+  /** Outside product catalogue (Channel3), or null when no key is set. */
+  catalog: ProductCatalog | null;
   identity: IdentityDeps;
   secrets: SecretBox;
   connections: PayPalConnections;
@@ -45,7 +48,7 @@ export type Container = {
   fetchImpl?: typeof fetch;
 };
 
-export type Overrides = { db?: Db; clock?: Clock; fetchImpl?: typeof fetch; passwordCost?: ScryptCost; workerId?: string; ai?: EvidenceAi | null; mailer?: Mailer | null };
+export type Overrides = { db?: Db; clock?: Clock; fetchImpl?: typeof fetch; passwordCost?: ScryptCost; workerId?: string; ai?: EvidenceAi | null; mailer?: Mailer | null; catalog?: ProductCatalog | null };
 
 export async function createContainer(config: Config, overrides: Overrides = {}): Promise<Container> {
   const clock = overrides.clock ?? systemClock;
@@ -62,6 +65,10 @@ export async function createContainer(config: Config, overrides: Overrides = {})
   const ai: EvidenceAi | null =
     overrides.ai !== undefined ? overrides.ai
     : config.gemini ? new GeminiEvidenceAi({ ...config.gemini, fetchImpl: overrides.fetchImpl })
+    : null;
+  const catalog: ProductCatalog | null =
+    overrides.catalog !== undefined ? overrides.catalog
+    : config.channel3 ? new Channel3Catalog({ ...config.channel3, fetchImpl: overrides.fetchImpl })
     : null;
   const connections = new PayPalConnections({ db, clock, secrets, config, fetchImpl: overrides.fetchImpl });
   const executor = new OperationExecutor({ db, clock, providers: connections.resolve });
@@ -102,7 +109,7 @@ export async function createContainer(config: Config, overrides: Overrides = {})
   });
 
   return {
-    config, db, clock, deps, ai, secrets, connections, executor, fx, runner, handlers, mailer, errorLog, fetchImpl: overrides.fetchImpl,
+    config, db, clock, deps, ai, catalog, secrets, connections, executor, fx, runner, handlers, mailer, errorLog, fetchImpl: overrides.fetchImpl,
     identity: { db, clock, passwordCost: overrides.passwordCost },
   };
 }

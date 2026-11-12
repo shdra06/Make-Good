@@ -5,15 +5,17 @@ import { Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { Locked, StepIntro } from "@/components/incident/bits";
+import { CatalogPanel } from "@/components/incident/catalog-panel";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/form";
 import { Alert, Card, Label } from "@/components/ui/primitives";
 import { api } from "@/lib/api";
-import { moneyMap } from "@/lib/format";
+import { day, money, moneyMap } from "@/lib/format";
 import { useIncident } from "@/lib/incident-context";
 import { DEFAULT_POLICIES, RULES } from "@/lib/labels";
+import { allowed } from "@/lib/org-action";
 import { useOrg } from "@/lib/session";
-import type { PolicyComparison } from "@/lib/types";
+import type { CatalogList, Compensation, PolicyComparison } from "@/lib/types";
 
 function Line({ label, value }: { label: string; value: React.ReactNode }) {
   return (
@@ -29,13 +31,17 @@ export default function OptionsStep() {
   const org = useOrg();
   const [priceWith, setPriceWith] = useState("current");
   const m = map.data!;
+  const catalogKey = ["incident", org?.orgId, incidentId, "catalog"];
+  const catalog = useQuery({ queryKey: catalogKey, queryFn: () => api.get<CatalogList>(`${incUrl}/catalog`), enabled: org !== null });
+  // The latest confirmed catalogue product, if it had a price, prices one more option: its replacement value per unit.
+  const ref = catalog.data?.references.find((r) => r.median_minor !== null && r.currency !== null) ?? null;
+  const replacement: Compensation | null = ref ? { type: "fixed_per_unit", fixedMinor: ref.median_minor!, fixedCurrency: ref.currency! } : null;
+  const ruleFor = (key: string): Compensation | null => (key === "catalog" ? replacement : (RULES[key]?.rule ?? null));
+  const chosen = priceWith === "current" ? null : ruleFor(priceWith);
   const policies = useQuery({
-    queryKey: ["incident", org?.orgId, incidentId, "policies", priceWith, candidates.dataUpdatedAt],
+    queryKey: ["incident", org?.orgId, incidentId, "policies", priceWith, ref?.id ?? null, candidates.dataUpdatedAt],
     queryFn: () =>
-      api.post<PolicyComparison>(
-        `${incUrl}/policies/compare`,
-        priceWith === "current" ? {} : { policies: DEFAULT_POLICIES.map((p) => ({ ...p, compensation: RULES[priceWith]!.rule })) },
-      ),
+      api.post<PolicyComparison>(`${incUrl}/policies/compare`, chosen ? { policies: DEFAULT_POLICIES.map((p) => ({ ...p, compensation: chosen })) } : {}),
     enabled: Boolean(m.lastMatch),
     placeholderData: (prev) => prev,
   });
@@ -67,6 +73,7 @@ export default function OptionsStep() {
   return (
     <>
       {intro}
+      {catalog.data ? <CatalogPanel incUrl={incUrl} listKey={catalogKey} list={catalog.data} canWrite={allowed(org?.permissions, "incident.write")} /> : null}
       <div className="mb-5 flex max-w-xl flex-col gap-1.5">
         <Label htmlFor="price-with">Price each option with</Label>
         <div className="flex items-center gap-2">
@@ -77,6 +84,11 @@ export default function OptionsStep() {
                 {r.label}
               </option>
             ))}
+            {ref ? (
+              <option value="catalog">
+                Replacement value: {money(ref.median_minor!, ref.currency!)} for each affected unit (Channel3, {day(ref.retrieved_at)})
+              </option>
+            ) : null}
           </Select>
           {policies.isFetching ? <Loader2 className="size-4 animate-spin text-muted-foreground" aria-label="Recalculating" /> : null}
         </div>

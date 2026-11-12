@@ -42,6 +42,7 @@ import { answerConfirm, confirmQuestion, createConfirmLink } from "../modules/in
 import { receivePayPalWebhook } from "../modules/paypal/webhooks.ts";
 import { comparePolicies, PolicyInput, recoveryMap } from "../modules/recovery/map.ts";
 import { recallTimeline } from "../modules/recovery/timeline.ts";
+import { CatalogConfirm, CatalogSearch, confirmCatalogProduct, listCatalogReferences, searchCatalog } from "../modules/catalog/service.ts";
 import * as reports from "../modules/reporting/queries.ts";
 import { linkOrdersToPayments, lookupPaymentsByIds, lookupPaymentsByReference, refreshDisputeStates } from "../modules/transactions/sync.ts";
 import { createRouter, OrgParams, Paging, parseCookies, SESSION_COOKIE, sessionCookie, uuid, type Router } from "./http.ts";
@@ -489,6 +490,23 @@ export function buildApp(c: Container): Router {
     method: "GET", path: "/api/orgs/:orgId/incidents/:incidentId/timeline", summary: "The recall on one time line: batch stock windows, mixed stock, ship dates and PayPal refund deadlines. Read only.", tag: "Recovery Map",
     auth: { permission: "org.read" }, params: Incident,
     handler: async ({ params, org }) => recallTimeline(c.db, org.orgId, params.incidentId, c.clock.now()),
+  });
+  // ---------- product catalogue evidence (Channel3) ----------
+  route({
+    method: "GET", path: "/api/orgs/:orgId/incidents/:incidentId/catalog", summary: "Catalogue products a person confirmed as the recalled one, with retailer prices when looked up", tag: "Evidence",
+    auth: { permission: "org.read" }, params: Incident,
+    handler: async ({ params, org }) => listCatalogReferences(c.db, c.catalog, org.orgId, params.incidentId),
+  });
+  route({
+    method: "POST", path: "/api/orgs/:orgId/incidents/:incidentId/catalog/search", summary: "Search the product catalogue. Sends only the query words. Nothing is saved.", tag: "Evidence",
+    auth: { permission: "incident.write" }, params: Incident, body: CatalogSearch,
+    handler: async ({ body, params, org }) => searchCatalog({ db: c.db, clock: c.clock, catalog: c.catalog }, { orgId: org.orgId, incidentId: params.incidentId, query: body.query }),
+  });
+  route({
+    method: "POST", path: "/api/orgs/:orgId/incidents/:incidentId/catalog/confirm", summary: "A person confirms which catalogue product is the recalled one. Its retailer prices are read now and saved, dated.", tag: "Evidence",
+    auth: { permission: "incident.write" }, params: Incident, body: CatalogConfirm,
+    handler: async ({ body, params, org, user }) =>
+      confirmCatalogProduct({ db: c.db, clock: c.clock, catalog: c.catalog }, { orgId: org.orgId, incidentId: params.incidentId, userId: user.id, ...body }),
   });
   route({
     method: "POST", path: "/api/orgs/:orgId/incidents/:incidentId/policies/compare", summary: "Price compensation policies against the records. A dry calculation: nothing is saved or paid.", tag: "Recovery Map",

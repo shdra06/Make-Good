@@ -46,6 +46,9 @@ services:
           property: connectionString
       - key: GEMINI_API_KEY
         sync: false
+      # Channel3 product catalogue (Options step: replacement value). Empty turns the panel off.
+      - key: CHANNEL3_API_KEY
+        sync: false
       # Emails (password reset, verification, customer notices). "file" keeps
       # them in the server's outbox folder and sends nothing. To send for real,
       # set EMAIL_TRANSPORT to resend, add RESEND_API_KEY, and set EMAIL_FROM to
