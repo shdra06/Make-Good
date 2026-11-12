@@ -68,6 +68,7 @@ function Tabs({ id }: { id: string }) {
     { slug: "notice", label: "Notice", done: p.rules, locked: false },
     { slug: "customers", label: "Customers", done: p.matched, locked: !p.rules },
     { slug: "evidence", label: "Evidence", done: p.matched, locked: !p.matched },
+    { slug: "timeline", label: "Timeline", done: p.matched, locked: !p.matched },
     { slug: "options", label: "Options", done: p.listed, locked: !p.matched },
     { slug: "approval", label: "Approval", done: p.approved, locked: !p.matched },
     { slug: "payments", label: "Payments", done: p.paid, locked: !p.approved },

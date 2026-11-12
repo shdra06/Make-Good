@@ -41,7 +41,7 @@ export const DISPOSITION_ORDER: readonly Disposition[] = [
   "pay_outside_paypal", "needs_manual_handling", "on_hold", "excluded", "declined", "nothing_to_pay", "not_affected",
 ];
 
-const DISPOSITION_TEXT: Record<Disposition, { label: string; why: string; group: "payable" | "paid" | "held" | "left_out" }> = {
+export const DISPOSITION_TEXT: Record<Disposition, { label: string; why: string; group: "payable" | "paid" | "held" | "left_out" }> = {
   ready: { label: "Ready for approval", why: "The payment is verified and the unit is proven, or a named person confirmed the record. Nothing is paid until a payment list is approved.", group: "payable" },
   in_a_batch: { label: "On a payment list", why: "Listed on a batch that has not started.", group: "payable" },
   in_progress: { label: "Being paid", why: "Sent to PayPal or waiting in the queue. Not shown as paid until PayPal confirms.", group: "payable" },

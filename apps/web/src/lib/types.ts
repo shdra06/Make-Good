@@ -250,3 +250,55 @@ export type CsvResult = {
   warnings: string[];
   links: { exact: number; heuristic: number };
 };
+
+export type TimelineDeadline = "open" | "closing_soon" | "closed" | "no_paypal_payment";
+export type TimelineBatch = {
+  id: string;
+  sku: string;
+  batchCode: string;
+  warehouse: string;
+  quantity: number | null;
+  receivedAt: string | null;
+  firstShippedAt: string | null;
+  lastShippedAt: string | null;
+  affected: boolean;
+};
+export type TimelineRecord = {
+  candidateId: string;
+  orderNumber: string | null;
+  customerName: string | null;
+  sku: string | null;
+  quantity: number;
+  placedAt: string | null;
+  shippedAt: string | null;
+  warehouse: string | null;
+  recordedBatches: string[];
+  paymentIdentity: PaymentIdentity;
+  eligibility: Eligibility;
+  disposition: string;
+  dispositionLabel: string;
+  paidAt: string | null;
+  refundDeadline: string | null;
+  daysLeft: number | null;
+  deadline: TimelineDeadline;
+};
+export type RecallTimeline = {
+  incident: { id: string; title: string };
+  labels: { merchantRecords: "synthetic" | "merchant" };
+  refundWindowDays: number;
+  closingSoonDays: number;
+  scope: { skus: string[]; batchCodes: string[]; shippedFrom: string | null; shippedTo: string | null } | null;
+  batches: TimelineBatch[];
+  mixedStock: Array<{ sku: string; warehouse: string; from: string; to: string; affectedBatch: string; otherBatch: string }>;
+  records: TimelineRecord[];
+  summary: {
+    records: number;
+    shippedInMixedStock: number;
+    windowOpen: number;
+    closingSoon: number;
+    closed: number;
+    noPaypalPayment: number;
+    owedAfterWindowClosed: number;
+    owedClosingSoon: number;
+  } | null;
+};

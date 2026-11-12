@@ -41,6 +41,7 @@ import { addRuleVersion, createIncident, decideCandidates, DecisionBasis, NewInc
 import { answerConfirm, confirmQuestion, createConfirmLink } from "../modules/incidents/confirm.ts";
 import { receivePayPalWebhook } from "../modules/paypal/webhooks.ts";
 import { comparePolicies, PolicyInput, recoveryMap } from "../modules/recovery/map.ts";
+import { recallTimeline } from "../modules/recovery/timeline.ts";
 import * as reports from "../modules/reporting/queries.ts";
 import { linkOrdersToPayments, lookupPaymentsByIds, lookupPaymentsByReference, refreshDisputeStates } from "../modules/transactions/sync.ts";
 import { createRouter, OrgParams, Paging, parseCookies, SESSION_COOKIE, sessionCookie, uuid, type Router } from "./http.ts";
@@ -483,6 +484,11 @@ export function buildApp(c: Container): Router {
     method: "GET", path: "/api/orgs/:orgId/incidents/:incidentId/recovery-map", summary: "Everyone who bought the product: where each record stands, why, and what is owed", tag: "Recovery Map",
     auth: { permission: "org.read" }, params: Incident,
     handler: async ({ params, org }) => recoveryMap(c.db, org.orgId, params.incidentId),
+  });
+  route({
+    method: "GET", path: "/api/orgs/:orgId/incidents/:incidentId/timeline", summary: "The recall on one time line: batch stock windows, mixed stock, ship dates and PayPal refund deadlines. Read only.", tag: "Recovery Map",
+    auth: { permission: "org.read" }, params: Incident,
+    handler: async ({ params, org }) => recallTimeline(c.db, org.orgId, params.incidentId, c.clock.now()),
   });
   route({
     method: "POST", path: "/api/orgs/:orgId/incidents/:incidentId/policies/compare", summary: "Price compensation policies against the records. A dry calculation: nothing is saved or paid.", tag: "Recovery Map",

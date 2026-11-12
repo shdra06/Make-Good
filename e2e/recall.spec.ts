@@ -93,6 +93,15 @@ test("a recall from notice to PayPal-confirmed refunds", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "This link cannot be used" })).toBeVisible();
   await page.goto(incidentUrl);
 
+  // The recall timeline (Bryntum Scheduler, Community tier): batches, mixed stock, refund windows. Read only.
+  await tab(page, "Timeline").click();
+  const chart = page.getByTestId("recall-timeline");
+  await expect(chart.locator(".b-sch-event-wrap").first()).toBeVisible();
+  await expect(chart).toContainText("Batch K-0719");
+  await expect(chart).toContainText("Mixed stock");
+  await expect(page.getByTestId("deadlines")).toContainText("None today");
+  await page.goto(incidentUrl);
+
   // Two payments carry one order number: a person says which
   await record(page, "4871").click();
   await page.getByRole("dialog").getByRole("radio").first().check();
