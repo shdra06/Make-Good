@@ -1,39 +1,47 @@
 # Submission video: plan and how to remake it
 
-Output: `demo/video/make-good-submission.mp4`, 1920 x 1080, about 3 min 47 s, with a neural voice-over. Video files are not in git; remake them with the commands at the end.
+Output: `demo/video/make-good-submission.mp4`, 1920 x 1080, 2 min 52 s, with a neural voice-over. It shows the Next.js app with the ceramic mug set example (CM-412, batch K-0719). Video files are not in git; remake them with the commands at the end.
 
 ## The plan
 
 | Time | Part | On screen | Point made |
 |---|---|---|---|
 | 0:00 | Title | Logo, one-line promise, four chips | What it is |
-| 0:07 | The problem (animation) | A recall notice, 40 orders with question marks, records that disagree (CM412, CM-4120, no batch code, two payments), then "refund everyone" ($ wasted) against "wait" (disputes pile up) | Why this is hard, and what it costs |
-| 0:35 | Our approach (animation) | Two questions per buyer; orders sort into ready, held for a person, not affected; one approved list; PayPal refunds each once; disputes 0, paid twice 0 | The idea in one picture |
-| 1:02 | Built with | Eight tiles: PayPal REST APIs, PayPal sandbox, Node 24 + TypeScript, PostgreSQL, Gemini, plain HTML/CSS/JS, 120 tests, Playwright | What it is built with |
-| 1:22 | The app, step by step | Real page in Edge with a visible cursor, a highlight on what is being explained, and a caption per step | How to navigate, and what each feature does |
-| 1:22 | | Open the recall case; simulator labels | Honest labels |
-| 1:32 | | Sidebar: done, do this now, Next step button; the key numbers | Where you are, what to do next |
-| 1:40 | | Step 1: read the notice, quotes, save the rules | People decide |
-| 1:55 | | Step 2: the two-answer table; look-alike codes decided by a person | The core idea |
-| 2:10 | | Step 3: Recovery Map, a held record's evidence | Why each customer stands where they do |
-| 2:22 | | Email the customer a link; the customer's own page | Asking the customer |
-| 2:32 | | Step 4: three policies priced | Cost of each choice |
-| 2:40 | | Step 5: one exact list, version and fingerprint, approved | Approval covers one list |
-| 2:50 | | Step 6: pay; a PayPal reply is lost on purpose; unknown, then settled once (the wait is sped up and says so) | Never paid twice |
-| 3:06 | | Customer emails, results against known answers, audit trail | What happened, on the record |
-| 3:19 | Credibility | Why you can trust it (labels, sandbox, tests, browser test) and Try it yourself (CSV, customer link, lose a reply, your sandbox) | How a judge can check and test it |
-| 3:41 | Close | Logo, promise, repository | |
+| 0:06 | The problem (animation) | A recall notice, 40 orders with question marks, records that disagree (CM412, CM-4120, no batch code, two payments), then "refund everyone" (money wasted) against "wait" (disputes pile up) | Why this is hard, and what it costs |
+| 0:25 | Our approach (animation) | Two questions per buyer; orders sort into ready, held for a person, not affected; one approved list; PayPal refunds each once; disputes 0, paid twice 0 | The idea in one picture |
+| 0:44 | Open the recall demo | Landing page with the 3D scene; the demo opens; the "simulator" and "synthetic" labels are highlighted | Honest labels |
+| 0:53 | Finding your way | Left menu, the step tabs, Next step | How to navigate |
+| 1:01 | Step 1 Notice | Read the notice; every line quotes it; save the rules | People decide |
+| 1:10 | Step 2 Customers | A CSV file checked before import; the two-answer table; look-alike codes decided by a person | The core idea |
+| 1:23 | Step 3 Evidence | A held customer's facts ("points the other way") | Why each customer stands where they do |
+| 1:32 | Customer link | Email a one-time link; the customer's own page; they type the batch code | Asking the customer |
+| 1:40 | Step 4 Options | Three refund policies, priced | Cost of each choice |
+| 1:45 | Step 5 Approval | One exact list with a sha-256 fingerprint; approved | Approval covers one list |
+| 1:53 | Step 6 Payments | A PayPal reply lost on purpose; unknown, then settled once (the wait is sped up 14 times, and the caption says so) | Never paid twice |
+| 2:05 | Customers told | "You were paid" emails, only after PayPal confirms; audit chain intact | What happened, on the record |
+| 2:12 | Around each recall | Claims form, Connections (PayPal, Shopify, WooCommerce, CSV), Team roles | The rest of the product |
+| 2:21 | Built with | Eight tiles: PayPal REST APIs, Next.js + React, Node + Fastify, PostgreSQL with row-level security and encryption, Gemini, PayPal sandbox, 155 tests, Render | What it is built with |
+| 2:32 | Credibility | Why you can trust it, and four ways to try it, including the live demo | How a judge can check and test it |
+| 2:48 | Close | Logo, promise, live address, repository | |
 
-The narration is in `demo/video-src/narration.json`. The AI steps are off in this recording (the Gemini key was at its daily limit); the voice-over says that the built-in rules read the notice and that Gemini does it when a key is set.
+The narration is in `demo/video-src/narration.json`. AI is off in this recording (Gemini was busy or at its limit); the voice-over says the notice is read "with Gemini or with built-in rules".
 
-## How it is made
+## How to remake it
 
-1. `python demo/video-src/make_voice.py` makes one voice clip per line with Microsoft's neural voice "Andrew" (edge-tts; only the narration text is sent) and measures each.
-2. (Removed on branch `production-grade`; still on `main`.) `node scripts/demo-video.ts` (in `apps/api`) starts the app in its own process (in-memory database, PayPal simulator), plays the animated scenes (`demo/video-src/scenes.html`), then drives the real page in Edge. Each step lasts at least as long as its voice clip. Frames come straight from the browser at up to 30 a second.
-3. The same script joins the frames and voice clips with ffmpeg. The long wait for PayPal is sped up eight times, and the caption says so.
+From the repository root:
 
 ```bash
-cd apps/api && python ../../demo/video-src/make_voice.py && npm run demo:video
+npm run build
 ```
 
-Needs Microsoft Edge, ffmpeg on the PATH (or `FFMPEG=` set), Python with `edge-tts`, and internet for the voice. Add `-- --ai` to the second command to show Gemini in the recording once the key works.
+```bash
+python demo/video-src/make_voice.py
+```
+
+```bash
+node demo/video-src/record.ts
+```
+
+- `make_voice.py` makes one clip per line with Microsoft's neural voice "Andrew" (edge-tts; only the narration text is sent). The recording used `RATE=+14%`.
+- `record.ts` starts its own API on port 4000 (fresh data folder, PayPal simulator, AI off) and the built web app on 3200, so both ports must be free. It plays the animated scenes (`scenes.html`), drives the app in Edge with a cursor, highlights and captions, and joins the frames and voice with ffmpeg. Each step lasts at least as long as its voice clip.
+- Needs Microsoft Edge, ffmpeg (`FFMPEG=` path or on PATH), Python with `edge-tts`, and internet for the voice. About 5 minutes.

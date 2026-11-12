@@ -98,7 +98,7 @@ Blocked on the owner:
 - [x] AI key: Gemini key in `apps/api/.env`, verified. Rotate it: it was pasted in a chat
 - [ ] Switch on Transaction Search for the PayPal app, then verify sync
 - [ ] Interview 3 to 5 shop owners (`docs/STRATEGY.md` section 5)
-- [ ] New demo video of the new web app. The old video tools (`demo-capture.ts`, `demo-video.ts`) drove the old page and were removed on `production-grade`; they are still on `main`. Port them to the new pages first
+- [x] New demo video of the new web app: `demo/video/make-good-submission.mp4` (2 min 52 s, voice-over, AI off). Remake: `demo/VIDEO-PLAN.md` (`node demo/video-src/record.ts`)
 
 Known loose end: another session's `integration/proposed-0002_…sql` (outside this repo) must become `0003` if it is ever applied.
 
@@ -116,4 +116,4 @@ Known loose end: another session's `integration/proposed-0002_…sql` (outside t
 - Validation errors now name the field and the reason.
 - Tests: 138 API, 17 Playwright. `RATE_LIMIT_SCALE` (ignored in production) lets the browser tests create many accounts.
 
-Not verified: Shopify and WooCommerce against a real store; Resend with a real key; the error webhook with a real Slack or Discord URL. Not done: database backups (needs a paid Render Postgres), uptime checks, billing, the new demo video.
+Not verified: Shopify and WooCommerce against a real store; Resend with a real key; the error webhook with a real Slack or Discord URL. Not done: database backups (needs a paid Render Postgres), uptime checks, billing. The demo video was remade on 12 Nov (see `demo/VIDEO-PLAN.md`).

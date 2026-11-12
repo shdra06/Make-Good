@@ -5,20 +5,20 @@
 <title>Make Good video scenes</title>
 <style>
   :root {
-    --navy: #00205b; --navy-2: #0b2f73; --blue: #0070e0; --blue-2: #3d8bff; --ink: #0d1b2e;
+    --navy: #06281c; --navy-2: #0d3a29; --blue: #15803d; --blue-2: #22c55e; --ink: #0d1b2e;
     --ok: #1fa35a; --hold: #f2a33a; --stop: #e5484d; --mute: #8a97ad;
     --display: "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; width: 1920px; height: 1080px; overflow: hidden; }
-  body { font-family: var(--display); color: #fff; background: radial-gradient(1400px 800px at 80% -10%, #12408f 0%, transparent 60%), radial-gradient(1000px 700px at -10% 110%, #0a3a7a 0%, transparent 55%), var(--navy); }
+  body { font-family: var(--display); color: #fff; background: radial-gradient(1400px 800px at 80% -10%, #1d5f8f 0%, transparent 60%), radial-gradient(1000px 700px at -10% 110%, #0f5a3a 0%, transparent 55%), var(--navy); }
   .scene { position: absolute; inset: 0; padding: 90px 110px; }
-  .eyebrow { font: 600 22px/1 var(--display); letter-spacing: .14em; text-transform: uppercase; color: #8fb8ff; }
+  .eyebrow { font: 600 22px/1 var(--display); letter-spacing: .14em; text-transform: uppercase; color: #86efac; }
   .head { font: 700 68px/1.08 var(--display); letter-spacing: -0.02em; margin-top: 18px; max-width: 1150px; min-height: 150px; }
   .fade { opacity: 0; transform: translateY(18px); transition: opacity .7s ease, transform .7s ease; }
   .fade.in { opacity: 1; transform: none; }
   .swap { transition: opacity .35s ease; }
-  .logo { display: inline-grid; place-items: center; border-radius: 28px; background: linear-gradient(135deg, var(--blue-2), #002a80); font-weight: 800; color: #fff; box-shadow: 0 20px 60px rgba(0, 0, 0, .35); }
+  .logo { display: inline-grid; place-items: center; border-radius: 28px; background: linear-gradient(135deg, #16a34a, #14532d); font-weight: 800; color: #fff; box-shadow: 0 20px 60px rgba(0, 0, 0, .35); }
 
   /* title and close */
   .center { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; height: 100%; gap: 26px; }
@@ -78,12 +78,12 @@
   /* stack and trust */
   .tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 22px; margin-top: 50px; }
   .tile { background: rgba(255, 255, 255, .08); border: 1px solid rgba(255, 255, 255, .14); border-radius: 22px; padding: 26px 26px 24px; min-height: 250px; }
-  .tile .k { display: inline-block; font-size: 17px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #8fb8ff; }
+  .tile .k { display: inline-block; font-size: 17px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #86efac; }
   .tile h3 { font-size: 33px; margin: 12px 0 10px; line-height: 1.15; }
   .tile p { margin: 0; font-size: 22px; color: #c8d8f5; line-height: 1.35; }
   .tile.paypal { background: linear-gradient(160deg, rgba(0, 112, 224, .45), rgba(0, 112, 224, .15)); border-color: rgba(61, 139, 255, .6); }
   .two { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-top: 46px; }
-  .two h2 { font-size: 34px; margin: 0 0 18px; color: #8fb8ff; font-weight: 700; }
+  .two h2 { font-size: 34px; margin: 0 0 18px; color: #86efac; font-weight: 700; }
   .item { display: flex; gap: 18px; align-items: flex-start; padding: 18px 22px; border-radius: 18px; background: rgba(255, 255, 255, .07); margin-bottom: 14px; }
   .item i { font-style: normal; flex: 0 0 auto; width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; font-weight: 800; font-size: 24px; background: var(--ok); }
   .item.try i { background: var(--blue); }
@@ -112,8 +112,8 @@ function count(el, to, ms, fmt = (n) => String(n)) {
 }
 
 // 40 invented orders; the same data in the problem and the solution.
-const ORDERS = Array.from({ length: 40 }, (_, i) => ({ n: 5001 + i, p: "HM-300" }));
-const TAGS = { 3: "HM300", 9: "HM-3000", 14: "no batch code", 21: "2 payments", 27: "shipped 2 batches", 33: "typed by hand" };
+const ORDERS = Array.from({ length: 40 }, (_, i) => ({ n: 5001 + i, p: "CM-412" }));
+const TAGS = { 3: "CM412", 9: "CM-4120", 14: "no batch code", 21: "2 payments", 27: "shipped 2 batches", 33: "typed by hand" };
 const READY = [0, 1, 2, 3, 4, 5, 6, 7, 10, 11, 12, 15, 16, 18, 19, 22, 23, 24, 26, 28, 30, 31, 35, 36];
 const HELD = [14, 21, 27, 33, 38, 8, 17];
 const role = (i) => (READY.includes(i) ? "ready" : HELD.includes(i) ? "held" : "out");
@@ -145,7 +145,7 @@ const scenes = {
     root.append(s);
     show(document.getElementById("eb"));
     const hd = document.getElementById("hd"), sd = document.getElementById("sd"), stage = document.getElementById("st");
-    const notice = html(`<div class="notice fade"><div style="font:700 20px/1 Segoe UI;letter-spacing:.1em;color:#b0223b">SAFETY RECALL NOTICE</div><div style="margin-top:12px">HM-300 hand mixer.<br>Speed controller can overheat.<br><b>Batch B-2217 only.</b></div></div>`);
+    const notice = html(`<div class="notice fade"><div style="font:700 20px/1 Segoe UI;letter-spacing:.1em;color:#b0223b">SAFETY RECALL NOTICE</div><div style="margin-top:12px">CM-412 mug set.<br>Glaze may release lead.<br><b>Batch K-0719 only.</b></div></div>`);
     sd.append(notice); at(0.03, () => show(notice));
     const cards = makeCards(stage);
     at(0.15, () => { setHead(hd, "Which customers received it?"); cards.forEach((c, i) => { place(c, gridPos(i)); c.style.transitionDelay = `${i * 22}ms`; c.style.opacity = 1; }); });
@@ -226,13 +226,13 @@ const scenes = {
   stack() {
     const tiles = [
       ["paypal", "Money", "PayPal REST APIs", "Orders, captures, refunds, payouts, disputes, transaction search, webhooks"],
-      ["", "Proof", "PayPal sandbox", "The full recall case run with real test payments and 16 real refunds"],
-      ["", "Backend", "Node.js 24 + TypeScript", "Fastify 5 and Zod, run directly with no build step"],
-      ["", "Data", "PostgreSQL", "Plain SQL migrations, an append-only audit trail, a job queue in the database"],
-      ["", "AI", "Google Gemini", "Reads the notice and explains holds. Code checks every quote; it decides nothing"],
-      ["", "Screens", "HTML, CSS, JavaScript", "No framework. One page, one step after another"],
-      ["", "Tests", "120 automated tests", "Node's test runner, with a PayPal simulator for failures on demand"],
-      ["", "Browser", "Playwright + Edge", "Clicks through the whole case in a real browser, 15 checks"],
+      ["", "Screens", "Next.js 16 + React 19", "TypeScript, Tailwind, TanStack Query; a step-by-step incident workspace"],
+      ["", "API", "Node.js 24 + Fastify", "TypeScript and Zod; Shopify, WooCommerce and CSV order imports"],
+      ["", "Data", "PostgreSQL", "Row-level security per shop, customer data encrypted at rest, an append-only audit trail"],
+      ["", "AI", "Google Gemini", "Reads the notice and explains holds. Code checks every quote; it never pays"],
+      ["", "Proof", "PayPal sandbox", "The full recall case run with real test payments and real refunds"],
+      ["", "Tests", "155 automated tests", "138 API tests with a PayPal simulator, 17 browser tests with Playwright"],
+      ["", "Live", "Hosted on Render", "make-good.onrender.com, one web service and Postgres"],
     ];
     const s = html(`<div class="scene"><div class="eyebrow fade" id="eb">How it is built</div><div class="head fade" id="hd" style="min-height:0">Built with</div><div class="tiles" id="tl"></div></div>`);
     root.append(s); show(document.getElementById("eb")); show(document.getElementById("hd"));
@@ -245,16 +245,16 @@ const scenes = {
       <div class="two"><div id="l"><h2 class="fade" id="lh">Why you can trust it</h2></div><div id="r"><h2 class="fade" id="rh">Try it yourself</h2></div></div></div>`);
     root.append(s); show(document.getElementById("eb")); show(document.getElementById("hd"));
     const left = [
-      ["Every screen says what is simulated", "\"PayPal: simulator, no real money\" and \"synthetic (invented)\""],
-      ["Run on the real PayPal sandbox", "16 real refunds, PayPal's own IDs in <code>docs/VERIFICATION.md</code>"],
-      ["120 automated tests", "<code>npm test</code>"],
-      ["The whole page, in a real browser", "<code>npm run test:e2e</code>"],
+      ["Every screen says what is simulated", "\"PayPal: simulator, no real money\" and \"Records: synthetic (invented)\""],
+      ["Run on the real PayPal sandbox", "PayPal's own refund IDs in <code>docs/VERIFICATION.md</code>"],
+      ["155 automated tests", "<code>npm test</code> and <code>npm run test:e2e</code>"],
+      ["An audit trail that cannot be edited", "Every decision, with who made it, chained by hash"],
     ];
     const right = [
-      ["Upload your own orders", "Question 2: a CSV file, checked before import"],
-      ["Send yourself the customer link", "Open a held record: Email the customer a link"],
-      ["Make PayPal lose a reply", "Question 7: Lose one reply from PayPal"],
-      ["Use your PayPal sandbox", "<code>npm run sandbox:recall</code>"],
+      ["Open the live demo", "<code>make-good.onrender.com</code>: Open the recall demo"],
+      ["Upload your own orders", "Customers tab: a CSV file, checked before import"],
+      ["Make PayPal lose a reply", "Payments tab: Lose one reply from PayPal"],
+      ["Connect your PayPal sandbox", "Connections: your own sandbox app"],
     ];
     at(0.02, () => show(document.getElementById("lh")));
     left.forEach(([b, t], i) => { const el = html(`<div class="item fade"><i>✓</i><div><b>${b}</b><span>${t}</span></div></div>`); document.getElementById("l").append(el); at(0.06 + i * 0.1, () => show(el)); });
@@ -267,7 +267,7 @@ const scenes = {
       <div class="logo fade" id="a">MG</div>
       <h1 class="fade" id="b">Make Good</h1>
       <p class="fade" id="c">The right customers, refunded once, with proof.</p>
-      <div class="chips fade" id="d"><span class="chip">github.com/shdra06/Make-Good</span><span class="chip">PayPal AI hackathon</span></div>
+      <div class="chips fade" id="d"><span class="chip">make-good.onrender.com</span><span class="chip">github.com/shdra06/Make-Good</span></div>
     </div></div>`));
     ["a", "b", "c", "d"].forEach((id, k) => at(0.02 + k * 0.1, () => show(document.getElementById(id))));
   },
