@@ -1,0 +1,16 @@
+{
+  "name": "@makegood/shared",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Types and plain helpers shared by the API and the web app. TypeScript source, no build step.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3"
+  }
+}

@@ -14,9 +14,8 @@ const config = loadConfig();
 const container = await createContainer(config);
 const { app } = buildApp(container);
 
-// Serve the web app from the same address as the API. It is plain HTML, CSS and JavaScript with no
-// build step, so the folder that is edited is the folder that is served.
-const webDist = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../web/public");
+// Serve the old one-page app (legacy-web) from the API until the Next.js app in apps/web replaces it.
+const webDist = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../legacy-web/public");
 if (fs.existsSync(path.join(webDist, "index.html"))) {
   const { default: fastifyStatic } = await import("@fastify/static");
   await app.register(fastifyStatic, { root: webDist, wildcard: false });

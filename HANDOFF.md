@@ -11,12 +11,16 @@ A PayPal hackathon project. When a supplier recalls one batch of a product, Make
 | Path | What |
 |---|---|
 | `apps/api/` | The platform backend. Fastify, TypeScript run directly by Node 24 (no build), PostgreSQL via PGlite locally. Port 4000. |
-| `apps/web/public/` | The page: `index.html`, `app.js`, `styles.css`. Plain JS, no build. Served by the API. App shell: navy sidebar with the steps (`sidebar()`, `nextStep()`), case header with key numbers (`caseHead()`), a floating "Next step" button. Do not reuse the class name `side` (the matrix uses it). |
+| `apps/web/` | **The new web app** (branch `production-grade`): Next.js 16, React 19, TypeScript, Tailwind 4, shadcn-style components in `src/components/ui`, TanStack Query. `/api/*` is forwarded to the API (`next.config.ts`). Port 3000. |
+| `packages/shared/` | Types shared by API and web (`Me`, roles, `formatMoney`). TypeScript source, no build. |
+| `apps/api/legacy-web/public/` | The old one-page app (plain JS). Still served by the API on port 4000 until the Next.js app covers every step; then delete it. |
+| `e2e/`, `playwright.config.ts` | Browser tests for the new app. Start their own API (4100) and web (3100). Edge locally, Chromium in CI. |
+| `scripts/dev.mjs`, `scripts/start.mjs` | Run API and web together (dev; production with the API private on 4001). |
 | `apps/api/db/migrations/` | `0001` to `0004`. Applied files are never edited; add `0005_…`. |
-| `render.yaml` | Render Blueprint: web service (API, worker, page) and free Postgres. Simulator on. Asks for `GEMINI_API_KEY`. |
+| `render.yaml` | Render Blueprint: one web service (`npm start`: Next.js public, API private) and free Postgres. Simulator on. Asks for `GEMINI_API_KEY`. Not yet deployed. |
 | `docs/CHECKLIST.md` | Status of everything, with evidence. Change it only after something ran and passed. |
 | `docs/` others | `STRATEGY.md`, `DEMO.md`, `ARCHITECTURE.md`, `PAYPAL.md`, `VERIFICATION.md` |
-| `src/`, `public/` (repo root) | The first prototype. Leave it alone. |
+| `docs/PRODUCTION-GAPS.md` | Everything between this build and a production-grade product, with severity. The work plan follows it. |
 
 Key backend modules (`apps/api/src/modules/`):
 
@@ -33,7 +37,18 @@ Key backend modules (`apps/api/src/modules/`):
 | `paypal/` | `rest-client.ts`, `simulator.ts`, `connections.ts` |
 | `api/routes.ts` | Every HTTP route |
 
-## Commands (run in `apps/api`)
+## Commands
+
+Repository root (npm workspaces; one `package-lock.json` at the root, `npm install` there):
+
+| Command | Use |
+|---|---|
+| `npm run dev` | API (4000) and web app (3000) together. Open http://localhost:3000. |
+| `npm run typecheck` / `npm run lint` / `npm run format` | All workspaces. CI runs the same. |
+| `npx playwright test` | Browser tests for the new web app (6 tests, about 30 s, Edge). |
+| `npm run build` then `npm start` | Production build and start, as on Render. |
+
+In `apps/api`:
 
 | Command | Use |
 |---|---|
@@ -93,4 +108,4 @@ Known loose end: another session's `integration/proposed-0002_…sql` (outside t
 
 ## Last session
 
-11 Nov 2026 (eighth sitting, Opus): submission video made (`demo/video/make-good-submission.mp4`, 3 min 47 s, voice-over, animations of the problem and the solution, the app walkthrough with cursor and captions, built-with and credibility slides). Plan and remake steps in `demo/VIDEO-PLAN.md`. AI was off in the recording (Gemini key at its limit). Fixed the squashed customer-email list. Next: when Gemini works, remake with `npm run demo:video -- --ai`.
+12 Nov 2026 (branch `production-grade`): step 1 of the rebuild done. Old prototype deleted. npm workspaces (`apps/api`, `apps/web`, `packages/shared`). New Next.js app: landing page with the demo button, sign-up, sign-in, sign-out, sign-in guard (`src/proxy.ts`), app shell with sidebar, dashboard, incidents list, incident page (placeholder for the workflow). Security headers. Old page moved to `apps/api/legacy-web`. CI now runs format, types, lint, API tests, web build and Playwright. `render.yaml` and the Dockerfile updated for workspaces; production mode checked locally (Render itself not yet). Checks: 120 API tests, 6 new browser tests, old browser test, all passing. Next: step 2, move the seven recall steps into the incident page as tabs until a Playwright test covers what `npm run test:e2e` covers; then delete `legacy-web`.

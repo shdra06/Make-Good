@@ -88,7 +88,7 @@ async function main(): Promise<number> {
   );
   const { app } = buildApp(c);
   const { default: fastifyStatic } = await import("@fastify/static");
-  await app.register(fastifyStatic, { root: path.join(REPO, "apps", "web", "public"), wildcard: false });
+  await app.register(fastifyStatic, { root: path.join(REPO, "apps", "api", "legacy-web", "public"), wildcard: false });
   await app.listen({ port: PORT, host: "127.0.0.1" });
   c.runner.start();
   console.log(`${fast ? "Browser test" : "Demo capture"} on http://localhost:${PORT} (PayPal simulator; AI: ${c.ai ? c.ai.model : "off"})\n`);

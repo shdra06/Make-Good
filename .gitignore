@@ -9,3 +9,10 @@ data/uploads/
 *.stackdump
 # Demo recordings are large; they are rebuilt with npm run demo:capture
 demo/video/
+
+# web app build output and test reports
+.next/
+next-env.d.ts
+*.tsbuildinfo
+test-results/
+playwright-report/

@@ -22,7 +22,7 @@ await migrate(db);
 const c = await createContainer({ ...config, gemini: useAi ? fromFile.gemini : null }, { db, passwordCost: { N: 1024, r: 8, p: 1 } });
 const { app } = buildApp(c);
 const { default: fastifyStatic } = await import("@fastify/static");
-await app.register(fastifyStatic, { root: path.join(REPO, "apps", "web", "public"), wildcard: false });
+await app.register(fastifyStatic, { root: path.join(REPO, "apps", "api", "legacy-web", "public"), wildcard: false });
 await app.listen({ port: PORT, host: "127.0.0.1" });
 c.runner.start();
 console.log(`READY ${c.ai ? c.ai.model : "off"}`);

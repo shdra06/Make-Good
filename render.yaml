@@ -1,5 +1,9 @@
-# Render Blueprint for Make Good: one web service (API, job worker and page)
-# and one PostgreSQL database. On Render: New > Blueprint > pick this repo.
+# Render Blueprint for Make Good: one web service and one PostgreSQL database.
+# On Render: New > Blueprint > pick this repo.
+#
+# The service runs two processes (scripts/start.mjs): the API privately on
+# port 4001 with its job worker, and the Next.js app on Render's PORT, which
+# passes /api/* to the API. One public address, first-party cookies.
 #
 # Runs on the PayPal simulator (no real money) with the synthetic recall case.
 # Render asks for GEMINI_API_KEY when the Blueprint is created; leave it empty
@@ -14,8 +18,8 @@ services:
     runtime: node
     plan: free
     region: oregon
-    buildCommand: npm ci --prefix apps/api --omit=dev
-    startCommand: node apps/api/src/server.ts
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npm start
     healthCheckPath: /api/health
     autoDeploy: true
     envVars:
@@ -23,6 +27,11 @@ services:
         value: "24"
       - key: NODE_ENV
         value: production
+      # Where the web app sends /api/*. Read when the web app is built.
+      - key: API_URL
+        value: http://127.0.0.1:4001
+      - key: API_PORT
+        value: "4001"
       # One process runs the API and the payment worker.
       - key: WORKER_INLINE
         value: "true"

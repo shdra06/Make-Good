@@ -1,30 +1,32 @@
 {
   "name": "make-good",
-  "version": "0.1.0",
   "private": true,
-  "description": "Make Good: find the customers a business owes money to after an incident, and pay them back through PayPal with one approval.",
+  "description": "Make Good: find the customers a merchant owes money to after a product recall, and pay them back through PayPal.",
   "type": "module",
   "license": "MIT",
   "engines": {
-    "node": ">=22.13"
+    "node": ">=24"
   },
+  "workspaces": [
+    "apps/api",
+    "apps/web",
+    "packages/*"
+  ],
   "scripts": {
-    "start": "tsx src/server.ts",
-    "dev": "tsx watch src/server.ts",
-    "seed": "tsx src/seed.ts",
-    "demo": "tsx src/cli.ts",
-    "typecheck": "tsc --noEmit",
-    "test": "tsx --test test/*.test.ts"
-  },
-  "dependencies": {
-    "@anthropic-ai/sdk": "latest",
-    "express": "^4.21.2",
-    "zod": "^3.24.1"
+    "dev": "node scripts/dev.mjs",
+    "dev:api": "npm run dev -w @makegood/api",
+    "dev:web": "npm run dev -w @makegood/web",
+    "build": "npm run build -w @makegood/web",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "format": "prettier --write apps/web packages scripts e2e playwright.config.ts",
+    "format:check": "prettier --check apps/web packages scripts e2e playwright.config.ts",
+    "test": "npm test -w @makegood/api",
+    "test:e2e": "playwright test",
+    "start": "node scripts/start.mjs"
   },
   "devDependencies": {
-    "@types/express": "^4.17.21",
-    "@types/node": "^22.10.0",
-    "tsx": "^4.19.2",
-    "typescript": "^5.7.2"
+    "@playwright/test": "1.65.0",
+    "prettier": "3.10.0"
   }
 }

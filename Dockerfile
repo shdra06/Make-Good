@@ -1,4 +1,4 @@
-# Make Good: the API, its worker and the web page in one image.
+# Make Good API and its worker in one image (the Next.js web app is deployed separately).
 # Not yet built or run anywhere: the development machine has no Docker.
 #
 #   docker build -t make-good .
@@ -7,12 +7,17 @@
 #
 # Without DATABASE_URL it keeps its own PostgreSQL files under /data.
 FROM node:24-slim
+WORKDIR /app
+# npm workspaces: the root lock file and every workspace's package.json.
+COPY package.json package-lock.json ./
+COPY apps/api/package.json apps/api/
+COPY apps/web/package.json apps/web/
+COPY packages/shared/package.json packages/shared/
+RUN npm ci --omit=dev -w @makegood/api
 WORKDIR /app/apps/api
-COPY apps/api/package.json apps/api/package-lock.json ./
-RUN npm ci --omit=dev
 COPY apps/api/src ./src
 COPY apps/api/db ./db
-COPY apps/web/public /app/apps/web/public
+COPY apps/api/legacy-web /app/apps/api/legacy-web
 ENV NODE_ENV=production PORT=4000 DATA_DIR=/data
 RUN mkdir -p /data && chown node:node /data
 VOLUME /data

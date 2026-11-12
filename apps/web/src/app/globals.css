@@ -1,0 +1,102 @@
+@import "tailwindcss";
+
+/* Dark mode follows the system unless the page sets class="dark". */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Design tokens. Every colour in the app comes from here. */
+:root {
+  --radius: 0.625rem;
+  --background: oklch(0.985 0.002 95);
+  --foreground: oklch(0.2 0.01 260);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.2 0.01 260);
+  --muted: oklch(0.96 0.004 95);
+  --muted-foreground: oklch(0.5 0.01 260);
+  --border: oklch(0.91 0.006 95);
+  --input: oklch(0.89 0.006 95);
+  --ring: oklch(0.45 0.12 155);
+  --primary: oklch(0.42 0.11 155);
+  --primary-foreground: oklch(0.98 0.01 155);
+  --secondary: oklch(0.95 0.006 95);
+  --secondary-foreground: oklch(0.25 0.01 260);
+  --accent: oklch(0.95 0.02 155);
+  --accent-foreground: oklch(0.3 0.08 155);
+  --destructive: oklch(0.55 0.2 25);
+  --destructive-foreground: oklch(0.98 0 0);
+  --ok: oklch(0.5 0.13 150);
+  --hold: oklch(0.62 0.14 70);
+  --info: oklch(0.5 0.14 255);
+  --sidebar: oklch(0.975 0.003 95);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not(.light) {
+    --background: oklch(0.17 0.006 260);
+    --foreground: oklch(0.95 0.004 95);
+    --card: oklch(0.21 0.007 260);
+    --card-foreground: oklch(0.95 0.004 95);
+    --muted: oklch(0.25 0.007 260);
+    --muted-foreground: oklch(0.7 0.01 260);
+    --border: oklch(0.3 0.008 260);
+    --input: oklch(0.34 0.008 260);
+    --ring: oklch(0.7 0.13 155);
+    --primary: oklch(0.72 0.14 155);
+    --primary-foreground: oklch(0.18 0.03 155);
+    --secondary: oklch(0.27 0.007 260);
+    --secondary-foreground: oklch(0.95 0.004 95);
+    --accent: oklch(0.28 0.04 155);
+    --accent-foreground: oklch(0.88 0.08 155);
+    --destructive: oklch(0.65 0.2 25);
+    --destructive-foreground: oklch(0.98 0 0);
+    --ok: oklch(0.72 0.14 150);
+    --hold: oklch(0.78 0.13 75);
+    --info: oklch(0.72 0.12 255);
+    --sidebar: oklch(0.19 0.006 260);
+  }
+}
+
+@theme inline {
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "Cascadia Mono", Consolas, monospace;
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-ok: var(--ok);
+  --color-hold: var(--hold);
+  --color-info: var(--info);
+  --color-sidebar: var(--sidebar);
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+  body {
+    background: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+}
