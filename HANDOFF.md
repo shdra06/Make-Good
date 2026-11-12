@@ -111,6 +111,12 @@ Known loose end: another session's `integration/proposed-0002_…sql` (outside t
 
 ## Last session
 
+12 Nov 2026, late (main checkout, `production-grade`, pushed to `main` as 47d95bc):
+- Tested the sponsor features. API 145/145, typecheck clean. Live site: the demo, the Channel3 search (real API, Render key) and the timeline data all work.
+- Bug fixed: on the live (production) build every Bryntum bar was transparent. Next's CSS build rewrites Bryntum's `light-dark()` into helper variables that only a `color-scheme` rule sets. `globals.css` now sets `color-scheme` (light, and dark under the system dark setting). Checked on a local production build in both modes. Dev mode never showed the bug. Needs a Render deploy to reach the live site.
+- Local only: `.claude/start-prod.mjs` runs the production build on 3300 with the API on 4000 (the build bakes in API port 4000).
+- `docs/DEVPOST.md`: the Devpost story, Built-with tags and form answers.
+
 12 Nov 2026, sponsor session (branch `sponsor-features`, in the worktree `../make-good-sponsors`; the main checkout was in use by another session):
 - Research checked against vendor pages: Bryntum 8 has a free MIT tier (packages end in `-community`; `@bryntum/scheduler` is an empty placeholder); time-range shading and AI are paid. Channel3 webhooks are signed (Standard Webhooks); subscriptions US/USD only.
 - Channel3 coverage, checked through its public MCP server (no key, search words only): 8 of 10 small brands and 6 of 6 big brands found in the top 3; bare model codes 0 of 4. So searches must use the product name, not a code.
