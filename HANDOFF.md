@@ -100,11 +100,11 @@ Blocked on the owner:
 - [ ] Interview 3 to 5 shop owners (`docs/STRATEGY.md` section 5)
 - [x] New demo video of the new web app: `demo/video/make-good-submission.mp4` (2 min 52 s, voice-over, AI off). Remake: `demo/VIDEO-PLAN.md` (`node demo/video-src/record.ts`)
 
-Sponsor features (branch `sponsor-features`, worktree `../make-good-sponsors`, not merged):
+Sponsor features (built on `sponsor-features`; merged into `production-grade` and `main` and deployed to Render on 12 Nov 2026, commit 39b8f4d):
 
 - [x] Bryntum recall timeline: Timeline step, `GET …/timeline` (`recovery/timeline.ts`). Bryntum Scheduler **Community 8.0.1 (MIT)** only, read only; no paid-tier features. Batch windows, mixed stock, ship dates, PayPal 180-day refund windows. Tests: `test/timeline.test.ts`, the recall browser test
 - [x] Channel3 replacement value: panel on the Options step, `…/catalog`, `…/catalog/search`, `…/catalog/confirm` (`modules/catalog/`), migration 0011 (rows never change). A person confirms the product; the median new in-stock price can price a "fixed per unit" option (dry run). Verified on the real Channel3 API on 12 Nov 2026 with `npm run catalog:verify` (search, product detail, confirm, audit, pricing a dry-run option; no money moved) and in the browser. Key in `apps/api/.env` of this worktree. Many products have offers from only 1 or 2 retailers, so the median can rest on one shop: the screen shows the count. Rotate the key: it was pasted in a chat
-- [ ] Before merging: if `production-grade` has gained its own `0011_…` migration, renumber this one
+- [x] Merged (fast-forward, no conflicts) and live: `/api/health` ok, the timeline and catalogue routes answer on https://make-good.onrender.com. `CHANNEL3_API_KEY` set in the Render dashboard by the owner. The two screens were not opened on the live site by Claude (no account there)
 - [ ] Channel3 Recall Radar (offer.deleted webhooks, Svix-signed, US/USD only): not built; needs the key and a public webhook URL
 
 Known loose end: another session's `integration/proposed-0002_…sql` (outside this repo) must become `0003` if it is ever applied.
