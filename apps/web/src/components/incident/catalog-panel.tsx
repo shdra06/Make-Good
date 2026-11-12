@@ -86,7 +86,7 @@ export function CatalogPanel({ incUrl, listKey, list, canWrite }: { incUrl: stri
                   {search.pending ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <Search className="size-4" aria-hidden />} Search
                 </Button>
               </div>
-              <p className="text-xs text-muted-foreground">Use the product&apos;s name and brand. A model code on its own rarely finds the product.</p>
+              <p className="text-xs text-muted-foreground">The product&apos;s name and brand work best. A model code alone may find the wrong item.</p>
             </form>
           ) : null}
           {result ? (

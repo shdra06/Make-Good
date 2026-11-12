@@ -18,7 +18,8 @@
     "smoke": "node scripts/smoke.ts",
     "sandbox": "node scripts/sandbox-verify.ts",
     "sandbox:recall": "node scripts/sandbox-recall.ts",
-    "ai:verify": "node scripts/ai-verify.ts"
+    "ai:verify": "node scripts/ai-verify.ts",
+    "catalog:verify": "node scripts/catalog-verify.ts"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.16",

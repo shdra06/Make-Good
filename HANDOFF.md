@@ -103,7 +103,7 @@ Blocked on the owner:
 Sponsor features (branch `sponsor-features`, worktree `../make-good-sponsors`, not merged):
 
 - [x] Bryntum recall timeline: Timeline step, `GET …/timeline` (`recovery/timeline.ts`). Bryntum Scheduler **Community 8.0.1 (MIT)** only, read only; no paid-tier features. Batch windows, mixed stock, ship dates, PayPal 180-day refund windows. Tests: `test/timeline.test.ts`, the recall browser test
-- [x] Channel3 replacement value: panel on the Options step, `…/catalog`, `…/catalog/search`, `…/catalog/confirm` (`modules/catalog/`), migration 0011 (rows never change). A person confirms the product; the median new in-stock price can price a "fixed per unit" option (dry run). Tested with a fake Channel3 only. **Needs `CHANNEL3_API_KEY`** to verify the real API
+- [x] Channel3 replacement value: panel on the Options step, `…/catalog`, `…/catalog/search`, `…/catalog/confirm` (`modules/catalog/`), migration 0011 (rows never change). A person confirms the product; the median new in-stock price can price a "fixed per unit" option (dry run). Verified on the real Channel3 API on 12 Nov 2026 with `npm run catalog:verify` (search, product detail, confirm, audit, pricing a dry-run option; no money moved) and in the browser. Key in `apps/api/.env` of this worktree. Many products have offers from only 1 or 2 retailers, so the median can rest on one shop: the screen shows the count. Rotate the key: it was pasted in a chat
 - [ ] Before merging: if `production-grade` has gained its own `0011_…` migration, renumber this one
 - [ ] Channel3 Recall Radar (offer.deleted webhooks, Svix-signed, US/USD only): not built; needs the key and a public webhook URL
 
@@ -115,7 +115,7 @@ Known loose end: another session's `integration/proposed-0002_…sql` (outside t
 - Research checked against vendor pages: Bryntum 8 has a free MIT tier (packages end in `-community`; `@bryntum/scheduler` is an empty placeholder); time-range shading and AI are paid. Channel3 webhooks are signed (Standard Webhooks); subscriptions US/USD only.
 - Channel3 coverage, checked through its public MCP server (no key, search words only): 8 of 10 small brands and 6 of 6 big brands found in the top 3; bare model codes 0 of 4. So searches must use the product name, not a code.
 - Built: the Bryntum timeline and the Channel3 replacement-value panel (see the work queue). Bryntum fetched Font Awesome from a CDN, blocked by our CSP; the icons now come from `@bryntum/core-community`.
-- Checks: see the commit messages on `sponsor-features`. Not verified: the real Channel3 REST API (no key).
+- Checks: see the commit messages on `sponsor-features`. The real Channel3 REST API was verified later the same day (`npm run catalog:verify`, `.data/catalog-verification.json`). Its REST search found a product from a bare model code (KHM512), unlike the public MCP search.
 - Local only: `.claude/dev-sponsors.mjs` runs this worktree on ports 4100/3200 (the e2e tests also use 4100: stop it first).
 
 Earlier, 12 Nov 2026 (branch `production-grade`, also on `main` and live on Render at https://make-good.onrender.com):
