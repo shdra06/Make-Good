@@ -54,12 +54,14 @@ services:
       # incoming webhook URL works). They are always listed on the Monitoring screen.
       - key: ERROR_WEBHOOK_URL
         sync: false
+      # Set in the dashboard and never overwritten by a Blueprint sync. Leave
+      # empty (or "file") until a Resend key is added; "resend" without a key stops the server.
       - key: EMAIL_TRANSPORT
-        value: file
+        sync: false
       - key: RESEND_API_KEY
         sync: false
       - key: EMAIL_FROM
-        value: Make Good <notices@example.com>
+        sync: false
       - key: LOG_LEVEL
         value: info
 
