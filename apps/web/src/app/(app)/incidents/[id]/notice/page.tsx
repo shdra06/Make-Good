@@ -1,11 +1,11 @@
 "use client";
 
 import { Loader2 } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { useState, type FormEvent, type ReactNode } from "react";
 import { Panel, Row, StepIntro, Tag } from "@/components/incident/bits";
 import { Field } from "@/components/field";
 import { Button } from "@/components/ui/button";
-import { Select } from "@/components/ui/form";
+import { Select, Textarea } from "@/components/ui/form";
 import { Label } from "@/components/ui/primitives";
 import { api } from "@/lib/api";
 import { day, words } from "@/lib/format";
@@ -48,6 +48,33 @@ function NoticeText({ body, output }: { body: string; output: ExtractionOutput |
     >
       {parts}
     </div>
+  );
+}
+
+function AddNotice() {
+  const { incUrl } = useIncident();
+  const { run, pending } = useAction();
+  const submit = (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const f = new FormData(e.currentTarget);
+    void run(
+      () => api.post(`${incUrl}/documents`, { kind: "supplier_notice", title: String(f.get("title") || "Supplier notice"), body: String(f.get("body")) }),
+      "The notice is attached. Read it next.",
+    );
+  };
+  return (
+    <Panel title="Add the supplier's notice" hint="Paste the text of the notice. It is stored as written and read into rules you check.">
+      <form onSubmit={submit} className="flex flex-col gap-4">
+        <Field label="Notice title" name="title" maxLength={200} placeholder="Safety recall notice" />
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="notice-body">Notice text</Label>
+          <Textarea id="notice-body" name="body" rows={10} required minLength={20} maxLength={60000} />
+        </div>
+        <Button type="submit" className="w-fit" disabled={pending}>
+          Attach the notice
+        </Button>
+      </form>
+    </Panel>
   );
 }
 
@@ -113,7 +140,7 @@ export default function NoticeStep() {
               <NoticeText body={doc.body} output={out} />
             </>
           ) : (
-            <p className="text-sm text-muted-foreground">No document is attached to this incident.</p>
+            <AddNotice />
           )}
         </div>
 
@@ -213,8 +240,15 @@ export default function NoticeStep() {
                 {extraction?.decided_by ?? "a member of staff"}, {day(m.rule.created_at)}
               </Row>
             </Panel>
-          ) : out ? (
-            <Panel title="Save the rules" hint="These become the incident's rules in your name. Change them if the reading is wrong.">
+          ) : (
+            <Panel
+              title="Save the rules"
+              hint={
+                out
+                  ? "These become the incident's rules in your name. Change them if the reading is wrong."
+                  : "Or enter them by hand: the product codes and batch codes the supplier names. They become the incident's rules in your name."
+              }
+            >
               <form
                 className="flex flex-col gap-4"
                 onSubmit={(e) => {
@@ -239,7 +273,7 @@ export default function NoticeStep() {
                 </Button>
               </form>
             </Panel>
-          ) : null}
+          )}
         </div>
       </div>
     </>

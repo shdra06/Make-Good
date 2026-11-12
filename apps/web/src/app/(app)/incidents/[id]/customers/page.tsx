@@ -5,7 +5,7 @@ import { Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Locked, Panel, Stat, StepIntro, Tag } from "@/components/incident/bits";
-import { CsvUpload } from "@/components/incident/csv-upload";
+import { CsvUpload } from "@/components/csv-upload";
 import { Button } from "@/components/ui/button";
 import { Table } from "@/components/ui/form";
 import { api } from "@/lib/api";
@@ -122,7 +122,7 @@ function Aliases({ aliases, aiConfigured }: { aliases: AliasResponse; aiConfigur
 }
 
 export default function CustomersStep() {
-  const { map, evidence, incUrl, incidentId } = useIncident();
+  const { map, evidence, incUrl, incidentId, orgUrl, refresh } = useIncident();
   const org = useOrg();
   const router = useRouter();
   const { run, pending } = useAction();
@@ -178,7 +178,7 @@ export default function CustomersStep() {
       </div>
 
       <div className="flex flex-col gap-6">
-        <CsvUpload />
+        <CsvUpload orgUrl={orgUrl} onImported={() => void refresh()} />
 
         {matched ? (
           <>

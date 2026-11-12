@@ -1,23 +1,32 @@
 "use client";
 
 import { FileUp } from "lucide-react";
+import { useMutation } from "@tanstack/react-query";
 import { useId, useState } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
-import { useAction, useIncident } from "@/lib/incident-context";
 import type { CsvResult } from "@/lib/types";
 
 /**
  * Orders from a spreadsheet. The file is checked first (dry run); nothing is
  * imported until Import is pressed, and a file with a bad row is not half-imported.
  */
-export function CsvUpload() {
-  const { orgUrl } = useIncident();
-  const { run, pending } = useAction();
+export function CsvUpload({ orgUrl, storeId: fixedStore, onImported }: { orgUrl: string; storeId?: string; onImported?: () => void }) {
+  const mutation = useMutation({
+    mutationFn: async ({ action }: { action: () => Promise<unknown>; done?: string }) => action(),
+    onSuccess: (_r, { done }) => {
+      if (done) toast.success(done);
+    },
+    onError: (err) => toast.error(err instanceof Error ? err.message : String(err)),
+  });
+  const run = <T,>(action: () => Promise<T>, done?: string) => mutation.mutateAsync({ action, done }).catch(() => undefined) as Promise<T | undefined>;
+  const pending = mutation.isPending;
   const inputId = useId();
   const [file, setFile] = useState<{ name: string; csv: string; storeId: string; result: CsvResult } | null>(null);
 
   const storeForCsv = async () => {
+    if (fixedStore) return fixedStore;
     const stores = await api.get<Array<{ id: string; kind: string }>>(`${orgUrl}/stores`);
     const found = stores.find((s) => s.kind === "csv") ?? stores[0];
     if (found) return found.id;
@@ -41,7 +50,10 @@ export function CsvUpload() {
       () => api.post<CsvResult>(`${orgUrl}/stores/${file.storeId}/orders/csv`, { csv: file.csv, dryRun: false }),
       "Orders imported. Run the match again to include them.",
     );
-    if (result) setFile({ ...file, csv: "", result });
+    if (result) {
+      setFile({ ...file, csv: "", result });
+      onImported?.();
+    }
   };
 
   const r = file?.result;

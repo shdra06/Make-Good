@@ -13,7 +13,7 @@ A PayPal hackathon project. When a supplier recalls one batch of a product, Make
 | `apps/api/` | The platform backend. Fastify, TypeScript run directly by Node 24 (no build), PostgreSQL via PGlite locally. Port 4000. |
 | `apps/web/` | **The web app** (branch `production-grade`). Incident steps are tabs under `src/app/(app)/incidents/[id]/` (notice, customers, evidence, options, approval, payments, activity); shared data in `src/lib/incident-context.tsx`; the customer page is `src/app/confirm/[token]`. Stack: Next.js 16, React 19, TypeScript, Tailwind 4, shadcn-style components in `src/components/ui`, TanStack Query. `/api/*` is forwarded to the API (`next.config.ts`). Port 3000. |
 | `packages/shared/` | Types shared by API and web (`Me`, roles, `formatMoney`). TypeScript source, no build. |
-| `e2e/`, `playwright.config.ts` | Browser tests: `foundation.spec.ts` (sign-up, sign-in, guard, demo) and `recall.spec.ts` (the whole recall case, 1 minute). Start their own API (4100, AI off) and web (3100). Edge locally, Chromium in CI. |
+| `e2e/`, `playwright.config.ts` | Browser tests: `foundation.spec.ts` (sign-up, sign-in, guard, demo), `recall.spec.ts` (the whole recall case, 1 minute) and `workspace.spec.ts` (open an incident, connections, team roles, settings, workspace switch). Start their own API (4100, AI off) and web (3100). Edge locally, Chromium in CI. |
 | `scripts/dev.mjs`, `scripts/start.mjs` | Run API and web together (dev; production with the API private on 4001). |
 | `apps/api/db/migrations/` | `0001` to `0004`. Applied files are never edited; add `0005_…`. |
 | `render.yaml` | Render Blueprint: one web service (`npm start`: Next.js public, API private) and free Postgres. Simulator on. Asks for `GEMINI_API_KEY`. Not yet deployed. |
@@ -44,7 +44,7 @@ Repository root (npm workspaces; one `package-lock.json` at the root, `npm insta
 |---|---|
 | `npm run dev` | API (4000) and web app (3000) together. Open http://localhost:3000. |
 | `npm run typecheck` / `npm run lint` / `npm run format` | All workspaces. CI runs the same. |
-| `npx playwright test` | Browser tests for the web app (7 tests, about 1.5 minutes, Edge). Must pass before every commit that touches the page. |
+| `npx playwright test` | Browser tests for the web app (10 tests, about 2 minutes, Edge). Must pass before every commit that touches the page. |
 | `npm run build` then `npm start` | Production build and start, as on Render. |
 
 In `apps/api`:
@@ -104,4 +104,4 @@ Known loose end: another session's `integration/proposed-0002_…sql` (outside t
 
 ## Last session
 
-12 Nov 2026 (branch `production-grade`), step 2 of the rebuild done: the whole recall workflow is in the Next.js app as tabs on the incident page (notice and rules, customers with CSV upload, two-answer table and product-code decisions, evidence with the record panel, options, approval, payments with simulator faults and customer emails, activity). Customer link is now `/confirm/<token>`. The old one-page app, its static serving in the API, and its video scripts are deleted. Checks: 120 API tests, 7 Playwright tests (including the full recall flow with a lost PayPal reply), types, lint, format, build. Next: step 3, the missing screens (connections, team and roles, settings, open an incident), then step 4, security. The demo video must be remade for the new pages.
+12 Nov 2026 (branch `production-grade`), step 3 done: new screens in the web app. Open an incident (`/incidents/new`, with an optional notice), attach a notice or set rules by hand on the Notice tab, Connections (PayPal REST app, simulator, check again, disconnect, copy transactions, stores and CSV import), Team (members, add by email, change role, what each role may do), Settings (four-eyes rule, approvals needed, large-list threshold, conversion cost). A workspace switcher appears when a user belongs to more than one. Screens hide what a role cannot do; the API still enforces it. Checks: 120 API tests, 10 Playwright tests, types, lint, format, build. Next: step 4, security (password reset, email verification, CSRF token, Content-Security-Policy, row-level security), then deploy to Render. Still missing: invitations by email, Shopify or WooCommerce connector, monitoring and analytics screens, the new demo video.

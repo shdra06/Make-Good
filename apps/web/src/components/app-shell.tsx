@@ -1,19 +1,22 @@
 "use client";
 
 import { ROLE_LABELS } from "@makegood/shared";
-import { AlertTriangle, LayoutDashboard, Loader2, LogOut, Menu, X } from "lucide-react";
+import { AlertTriangle, LayoutDashboard, Loader2, LogOut, Menu, Plug, Settings, Users, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import { Logo } from "@/components/logo";
 import { Button } from "@/components/ui/button";
 import { Alert, Badge } from "@/components/ui/primitives";
-import { useMe, useSignOut } from "@/lib/session";
+import { chooseOrg, useMe, useOrg, useSignOut } from "@/lib/session";
 import { cn } from "@/lib/utils";
 
 const NAV = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/incidents", label: "Incidents", icon: AlertTriangle },
+  { href: "/connections", label: "Connections", icon: Plug },
+  { href: "/team", label: "Team", icon: Users },
+  { href: "/settings", label: "Settings", icon: Settings },
 ];
 
 function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
@@ -44,6 +47,7 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
 
 export function AppShell({ children }: { children: ReactNode }) {
   const me = useMe();
+  const org = useOrg();
   const signOut = useSignOut();
   const router = useRouter();
   const pathname = usePathname();
@@ -69,14 +73,36 @@ export function AppShell({ children }: { children: ReactNode }) {
   }
 
   const { user, organisations, server } = me.data;
-  const org = organisations[0];
 
   const sidebar = (
     <div className="flex h-full flex-col gap-6 p-4">
       <Logo href="/dashboard" className="px-2" />
       {org ? (
         <div className="rounded-lg border bg-card px-3 py-2">
-          <p className="truncate text-sm font-medium">{org.name}</p>
+          {organisations.length > 1 ? (
+            <>
+              <label htmlFor="workspace" className="sr-only">
+                Workspace
+              </label>
+              <select
+                id="workspace"
+                className="w-full truncate bg-transparent text-sm font-medium outline-none"
+                value={org.orgId}
+                onChange={(e) => {
+                  chooseOrg(e.target.value);
+                  router.push("/dashboard");
+                }}
+              >
+                {organisations.map((o) => (
+                  <option key={o.orgId} value={o.orgId}>
+                    {o.name}
+                  </option>
+                ))}
+              </select>
+            </>
+          ) : (
+            <p className="truncate text-sm font-medium">{org.name}</p>
+          )}
           <p className="text-xs text-muted-foreground">{ROLE_LABELS[org.role]}</p>
         </div>
       ) : null}
